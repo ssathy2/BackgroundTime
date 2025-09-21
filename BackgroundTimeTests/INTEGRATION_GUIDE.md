@@ -348,7 +348,7 @@ extension BackgroundTime {
         
         // Long execution times
         if stats.averageExecutionTime > 25.0 {
-            issues.append("Background tasks taking too long: \(String(format: "%.1fs", stats.averageExecutionTime)) average")
+            issues.append("Background tasks taking too long: \(String(format: "%lld", stats.averageExecutionTime)) average")
         }
         
         // No recent executions

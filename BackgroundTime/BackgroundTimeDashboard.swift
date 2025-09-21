@@ -116,7 +116,7 @@ struct OverviewTabView: View {
                     
                     StatisticCard(
                         title: "Avg Duration",
-                        value: String(format: "%.1fs", viewModel.statistics?.averageExecutionTime ?? 0),
+                        value: "\(viewModel.statistics?.averageExecutionTime ?? 0)",
                         icon: "timer.fill",
                         color: .orange
                     )
