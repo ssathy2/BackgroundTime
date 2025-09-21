@@ -63,11 +63,26 @@
 		DE48B6BC2E7E6148009A676E /* BackgroundTimeExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BackgroundTimeExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DE48B6CA2E7E614A009A676E /* BackgroundTimeExampleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BackgroundTimeExampleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DE48B6D42E7E614A009A676E /* BackgroundTimeExampleUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BackgroundTimeExampleUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DE48B70E2E7E67B3009A676E /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/UIKit.framework; sourceTree = DEVELOPER_DIR; };
+		DE48B7102E7E67B8009A676E /* BackgroundTasks.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = BackgroundTasks.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/BackgroundTasks.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		DE9C66942E7F86D6004FC608 /* Exceptions for "BackgroundTime" folder in "BackgroundTime" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				BackgroundTime.docc,
+			);
+			target = DE48B69D2E7E6128009A676E /* BackgroundTime */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		DE48B6A02E7E6128009A676E /* BackgroundTime */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				DE9C66942E7F86D6004FC608 /* Exceptions for "BackgroundTime" folder in "BackgroundTime" target */,
+			);
 			path = BackgroundTime;
 			sourceTree = "<group>";
 		};
@@ -162,6 +177,8 @@
 		DE48B6E52E7E615D009A676E /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				DE48B7102E7E67B8009A676E /* BackgroundTasks.framework */,
+				DE48B70E2E7E67B3009A676E /* UIKit.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -573,7 +590,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALLOW_TARGET_PLATFORM_SPECIALIZATION = YES;
-				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = S6WS4PD5A7;
@@ -618,7 +634,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALLOW_TARGET_PLATFORM_SPECIALIZATION = YES;
-				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = S6WS4PD5A7;

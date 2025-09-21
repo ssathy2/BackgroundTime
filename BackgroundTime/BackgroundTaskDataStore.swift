@@ -1,0 +1,220 @@
+//
+//  BackgroundTaskDataStore.swift
+//  BackgroundTime
+//
+//  Created by Siddharth Sathyam on 9/19/25.
+//
+
+import Foundation
+import os.log
+
+// MARK: - Data Storage Manager
+
+class BackgroundTaskDataStore {
+    static let shared = BackgroundTaskDataStore()
+    
+    private let logger = Logger(subsystem: "BackgroundTime", category: "DataStore")
+    private let dataQueue = DispatchQueue(label: "BackgroundTime.DataStore", attributes: .concurrent)
+    private var events: [BackgroundTaskEvent] = []
+    private var maxStoredEvents = 1000
+    
+    private let userDefaults = UserDefaults(suiteName: "BackgroundTime.DataStore")
+    private let eventsKey = "BackgroundTime.StoredEvents"
+    
+    private init() {
+        loadPersistedEvents()
+    }
+    
+    func configure(maxStoredEvents: Int) {
+        dataQueue.async(flags: .barrier) {
+            self.maxStoredEvents = maxStoredEvents
+            self.trimEventsIfNeeded()
+        }
+    }
+    
+    func recordEvent(_ event: BackgroundTaskEvent) {
+        dataQueue.async(flags: .barrier) {
+            self.events.append(event)
+            self.trimEventsIfNeeded()
+            self.persistEvents()
+            
+            self.logger.info("Recorded event: \(event.type.rawValue) for task: \(event.taskIdentifier)")
+        }
+    }
+    
+    func getAllEvents() -> [BackgroundTaskEvent] {
+        return dataQueue.sync {
+            return Array(self.events)
+        }
+    }
+    
+    func getEvents(for taskIdentifier: String) -> [BackgroundTaskEvent] {
+        return dataQueue.sync {
+            return self.events.filter { $0.taskIdentifier == taskIdentifier }
+        }
+    }
+    
+    func getEventsInDateRange(from startDate: Date, to endDate: Date) -> [BackgroundTaskEvent] {
+        return dataQueue.sync {
+            return self.events.filter { event in
+                event.timestamp >= startDate && event.timestamp <= endDate
+            }
+        }
+    }
+    
+    func generateStatistics() -> BackgroundTaskStatistics {
+        return dataQueue.sync {
+            let totalScheduled = self.events.filter { $0.type == .taskScheduled }.count
+            let totalExecuted = self.events.filter { $0.type == .taskExecutionStarted }.count
+            let totalCompleted = self.events.filter { $0.type == .taskExecutionCompleted && $0.success }.count
+            let totalFailed = self.events.filter { $0.type == .taskFailed || ($0.type == .taskExecutionCompleted && !$0.success) }.count
+            let totalExpired = self.events.filter { $0.type == .taskExpired }.count
+            
+            let completedEvents = self.events.filter { 
+                $0.type == .taskExecutionCompleted && $0.duration != nil 
+            }
+            
+            let averageExecutionTime = completedEvents.isEmpty ? 0 : 
+                completedEvents.compactMap { $0.duration }.reduce(0, +) / Double(completedEvents.count)
+            
+            let successRate = totalExecuted > 0 ? Double(totalCompleted) / Double(totalExecuted) : 0
+            
+            let executionsByHour = Dictionary(grouping: self.events.filter { $0.type == .taskExecutionStarted }) { event in
+                Calendar.current.component(.hour, from: event.timestamp)
+            }.mapValues { $0.count }
+            
+            let errorsByType = Dictionary(grouping: self.events.filter { !$0.success && $0.errorMessage != nil }) { event in
+                event.errorMessage ?? "Unknown Error"
+            }.mapValues { $0.count }
+            
+            let lastExecutionTime = self.events
+                .filter { $0.type == .taskExecutionStarted }
+                .max(by: { $0.timestamp < $1.timestamp })?.timestamp
+            
+            return BackgroundTaskStatistics(
+                totalTasksScheduled: totalScheduled,
+                totalTasksExecuted: totalExecuted,
+                totalTasksCompleted: totalCompleted,
+                totalTasksFailed: totalFailed,
+                totalTasksExpired: totalExpired,
+                averageExecutionTime: averageExecutionTime,
+                successRate: successRate,
+                executionsByHour: executionsByHour,
+                errorsByType: errorsByType,
+                lastExecutionTime: lastExecutionTime,
+                generatedAt: Date()
+            )
+        }
+    }
+    
+    func clearAllEvents() {
+        dataQueue.async(flags: .barrier) {
+            self.events.removeAll()
+            self.persistEvents()
+            self.logger.info("Cleared all stored events")
+        }
+    }
+    
+    // MARK: - Private Methods
+    
+    private func trimEventsIfNeeded() {
+        if events.count > maxStoredEvents {
+            let eventsToRemove = events.count - maxStoredEvents
+            events.removeFirst(eventsToRemove)
+            logger.info("Trimmed \(eventsToRemove) old events")
+        }
+    }
+    
+    private func persistEvents() {
+        do {
+            let data = try JSONEncoder().encode(events)
+            userDefaults?.set(data, forKey: eventsKey)
+        } catch {
+            logger.error("Failed to persist events: \(error.localizedDescription)")
+        }
+    }
+    
+    private func loadPersistedEvents() {
+        guard let data = userDefaults?.data(forKey: eventsKey) else { return }
+        
+        do {
+            events = try JSONDecoder().decode([BackgroundTaskEvent].self, from: data)
+            logger.info("Loaded \(self.events.count) persisted events")
+        } catch {
+            logger.error("Failed to load persisted events: \(error.localizedDescription)")
+            events = []
+        }
+    }
+}
+
+// MARK: - Analytics Helper
+
+extension BackgroundTaskDataStore {
+    func getTaskPerformanceMetrics(for taskIdentifier: String) -> TaskPerformanceMetrics? {
+        let taskEvents = getEvents(for: taskIdentifier)
+        
+        guard !taskEvents.isEmpty else { return nil }
+        
+        let scheduledEvents = taskEvents.filter { $0.type == .taskScheduled }
+        let executedEvents = taskEvents.filter { $0.type == .taskExecutionStarted }
+        let completedEvents = taskEvents.filter { $0.type == .taskExecutionCompleted }
+        let failedEvents = taskEvents.filter { $0.type == .taskFailed || ($0.type == .taskExecutionCompleted && !$0.success) }
+        
+        let averageDuration = completedEvents.compactMap { $0.duration }.isEmpty ? 0 :
+            completedEvents.compactMap { $0.duration }.reduce(0, +) / Double(completedEvents.count)
+        
+        let successRate = executedEvents.count > 0 ? 
+            Double(completedEvents.filter { $0.success }.count) / Double(executedEvents.count) : 0
+        
+        return TaskPerformanceMetrics(
+            taskIdentifier: taskIdentifier,
+            totalScheduled: scheduledEvents.count,
+            totalExecuted: executedEvents.count,
+            totalCompleted: completedEvents.count,
+            totalFailed: failedEvents.count,
+            averageDuration: averageDuration,
+            successRate: successRate,
+            lastExecutionDate: executedEvents.max(by: { $0.timestamp < $1.timestamp })?.timestamp
+        )
+    }
+    
+    func getDailyExecutionPattern() -> [DailyExecutionData] {
+        let calendar = Calendar.current
+        let grouped = Dictionary(grouping: events.filter { $0.type == .taskExecutionStarted }) { event in
+            calendar.startOfDay(for: event.timestamp)
+        }
+        
+        return grouped.map { date, events in
+            let hourlyDistribution = Dictionary(grouping: events) { event in
+                calendar.component(.hour, from: event.timestamp)
+            }.mapValues { $0.count }
+            
+            return DailyExecutionData(
+                date: date,
+                totalExecutions: events.count,
+                hourlyDistribution: hourlyDistribution,
+                successfulExecutions: events.filter { $0.success }.count
+            )
+        }.sorted(by: { $0.date < $1.date })
+    }
+}
+
+// MARK: - Performance Metrics Models
+
+public struct TaskPerformanceMetrics: Codable {
+    public let taskIdentifier: String
+    public let totalScheduled: Int
+    public let totalExecuted: Int
+    public let totalCompleted: Int
+    public let totalFailed: Int
+    public let averageDuration: TimeInterval
+    public let successRate: Double
+    public let lastExecutionDate: Date?
+}
+
+public struct DailyExecutionData: Codable {
+    public let date: Date
+    public let totalExecutions: Int
+    public let hourlyDistribution: [Int: Int]
+    public let successfulExecutions: Int
+}
