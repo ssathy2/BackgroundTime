@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Charts
+import BackgroundTasks
 
 // MARK: - Main Dashboard View
 
@@ -49,6 +50,15 @@ public struct BackgroundTimeDashboard: View {
                             Label("Errors", systemImage: "exclamationmark.triangle.fill")
                         }
                         .tag(DashboardTab.errors)
+                    
+                    // Continuous Tasks Tab (iOS 26.0+)
+                    if #available(iOS 26.0, *) {
+                        ContinuousTasksTabView(viewModel: viewModel)
+                            .tabItem {
+                                Label("Continuous", systemImage: "infinity.circle.fill")
+                            }
+                            .tag(DashboardTab.continuousTasks)
+                    }
                 }
             }
             .navigationTitle("BackgroundTime")
@@ -117,9 +127,14 @@ struct OverviewTabView: View {
                     StatisticCard(
                         title: "Avg Duration",
                         value: "\(viewModel.statistics?.averageExecutionTime ?? 0)",
-                        icon: "timer.fill",
+                        icon: "timer",
                         color: .orange
                     )
+                }
+                
+                // Continuous Tasks Section (iOS 26.0+)
+                if #available(iOS 26.0, *), UIDevice.supportsContinuousBackgroundTasks {
+                    continuousTasksOverviewSection
                 }
                 
                 // Execution Pattern Chart
@@ -152,6 +167,48 @@ struct OverviewTabView: View {
         }
         .refreshable {
             viewModel.refresh()
+        }
+    }
+    
+    // MARK: - Continuous Tasks Overview Section (iOS 26.0+)
+    
+    @available(iOS 26.0, *)
+    @ViewBuilder
+    private var continuousTasksOverviewSection: some View {
+        let continuousEvents = viewModel.events.filter { $0.type.isContinuousTaskEvent }
+        
+        if !continuousEvents.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Continuous Tasks")
+                    .font(.headline)
+                    .padding(.horizontal)
+                
+                HStack(spacing: 16) {
+                    let activeTasks = Set(continuousEvents
+                        .filter { $0.type == .continuousTaskStarted }
+                        .map { $0.taskIdentifier })
+                    let stoppedTasks = Set(continuousEvents
+                        .filter { $0.type == .continuousTaskStopped }
+                        .map { $0.taskIdentifier })
+                    let currentlyActive = activeTasks.subtracting(stoppedTasks)
+                    
+                    StatisticCard(
+                        title: "Active Tasks",
+                        value: "\(currentlyActive.count)",
+                        icon: "infinity.circle.fill",
+                        color: .purple
+                    )
+                    
+                    StatisticCard(
+                        title: "Total Events",
+                        value: "\(continuousEvents.count)",
+                        icon: "chart.line.uptrend.xyaxis",
+                        color: .indigo
+                    )
+                }
+            }
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
         }
     }
 }
@@ -288,6 +345,317 @@ struct ErrorsTabView: View {
         let failedEvents = viewModel.events.filter { !$0.success }
         ForEach(failedEvents) { event in
             ErrorEventCard(event: event)
+        }
+    }
+}
+
+// MARK: - Continuous Tasks Tab (iOS 26.0+)
+
+@available(iOS 26.0, *)
+struct ContinuousTasksTabView: View {
+    @ObservedObject var viewModel: DashboardViewModel
+    
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                // Active Continuous Tasks Summary
+                continuousTasksSummary
+                
+                // Active Tasks List
+                activeTasksList
+                
+                // Continuous Tasks Timeline
+                continuousTasksTimeline
+                
+                // Performance Metrics
+                continuousTasksPerformance
+            }
+            .padding()
+        }
+        .refreshable {
+            viewModel.refresh()
+        }
+    }
+    
+    @ViewBuilder
+    private var continuousTasksSummary: some View {
+        let continuousEvents = viewModel.events.filter { $0.type.isContinuousTaskEvent }
+        let activeTasks = Set(continuousEvents
+            .filter { $0.type == .continuousTaskStarted }
+            .map { $0.taskIdentifier })
+        let stoppedTasks = Set(continuousEvents
+            .filter { $0.type == .continuousTaskStopped }
+            .map { $0.taskIdentifier })
+        let currentlyActive = activeTasks.subtracting(stoppedTasks)
+        
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Continuous Tasks Overview")
+                .font(.headline)
+                .padding(.horizontal)
+            
+            HStack(spacing: 16) {
+                StatisticCard(
+                    title: "Active Tasks",
+                    value: "\(currentlyActive.count)",
+                    icon: "infinity.circle.fill",
+                    color: .blue
+                )
+                
+                StatisticCard(
+                    title: "Total Started",
+                    value: "\(activeTasks.count)",
+                    icon: "play.circle.fill",
+                    color: .green
+                )
+            }
+            
+            HStack(spacing: 16) {
+                StatisticCard(
+                    title: "Completed",
+                    value: "\(stoppedTasks.count)",
+                    icon: "checkmark.circle.fill",
+                    color: .orange
+                )
+                
+                let pausedCount = continuousEvents.filter { $0.type == .continuousTaskPaused }.count
+                StatisticCard(
+                    title: "Paused",
+                    value: "\(pausedCount)",
+                    icon: "pause.circle.fill",
+                    color: .yellow
+                )
+            }
+        }
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+    
+    @ViewBuilder
+    private var activeTasksList: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Active Continuous Tasks")
+                .font(.headline)
+                .padding(.horizontal)
+            
+            let continuousEvents = viewModel.events.filter { $0.type.isContinuousTaskEvent }
+            let tasksByIdentifier = Dictionary(grouping: continuousEvents) { $0.taskIdentifier }
+            
+            if tasksByIdentifier.isEmpty {
+                Text("No continuous tasks found")
+                    .foregroundColor(.secondary)
+                    .padding()
+            } else {
+                LazyVStack(spacing: 8) {
+                    ForEach(Array(tasksByIdentifier.keys.sorted()), id: \.self) { taskIdentifier in
+                        if let events = tasksByIdentifier[taskIdentifier] {
+                            ContinuousTaskRow(taskIdentifier: taskIdentifier, events: events)
+                        }
+                    }
+                }
+            }
+        }
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+    
+    @ViewBuilder
+    private var continuousTasksTimeline: some View {
+        let continuousEvents = viewModel.events
+            .filter { $0.type.isContinuousTaskEvent }
+            .sorted { $0.timestamp > $1.timestamp }
+        
+        if !continuousEvents.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Continuous Tasks Timeline")
+                    .font(.headline)
+                    .padding(.horizontal)
+                
+                Chart {
+                    ForEach(continuousEvents.prefix(20)) { event in
+                        PointMark(
+                            x: .value("Time", event.timestamp),
+                            y: .value("Task", event.taskIdentifier)
+                        )
+                        .foregroundStyle(colorForEventType(event.type))
+                    }
+                }
+                .frame(height: 200)
+                .padding(.horizontal)
+            }
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+        }
+    }
+    
+    @ViewBuilder
+    private var continuousTasksPerformance: some View {
+        let continuousEvents = viewModel.events.filter { $0.type.isContinuousTaskEvent }
+        let taskGroups = Dictionary(grouping: continuousEvents) { $0.taskIdentifier }
+        
+        if !taskGroups.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Task Performance")
+                    .font(.headline)
+                    .padding(.horizontal)
+                
+                LazyVStack(spacing: 8) {
+                    ForEach(Array(taskGroups.keys.sorted()), id: \.self) { taskIdentifier in
+                        if let events = taskGroups[taskIdentifier] {
+                            ContinuousTaskPerformanceCard(taskIdentifier: taskIdentifier, events: events)
+                        }
+                    }
+                }
+            }
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+        }
+    }
+    
+    private func colorForEventType(_ type: BackgroundTaskEventType) -> Color {
+        switch type {
+        case .continuousTaskStarted: return .green
+        case .continuousTaskPaused: return .yellow
+        case .continuousTaskResumed: return .blue
+        case .continuousTaskStopped: return .red
+        case .continuousTaskProgress: return .purple
+        default: return .gray
+        }
+    }
+}
+
+@available(iOS 26.0, *)
+struct ContinuousTaskRow: View {
+    let taskIdentifier: String
+    let events: [BackgroundTaskEvent]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Circle()
+                    .fill(currentStatus.color)
+                    .frame(width: 8, height: 8)
+                
+                Text(taskIdentifier)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                
+                Spacer()
+                
+                Text(currentStatus.displayName)
+                    .font(.caption2)
+                    .foregroundColor(currentStatus.color)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(currentStatus.color.opacity(0.1))
+                    .cornerRadius(4)
+            }
+            
+            if let latestEvent = events.max(by: { $0.timestamp < $1.timestamp }) {
+                HStack {
+                    Text("Last Update:")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Text(latestEvent.timestamp, style: .relative)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+            }
+            
+            // Progress indicator if available
+            if let progressEvent = events.filter({ $0.type == .continuousTaskProgress }).last {
+                ProgressView(value: 0.7) // Placeholder - you'd extract actual progress from metadata
+                    .progressViewStyle(LinearProgressViewStyle())
+                    .frame(height: 4)
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(8)
+    }
+    
+    private var currentStatus: ContinuousTaskDisplayStatus {
+        let sortedEvents = events.sorted { $0.timestamp > $1.timestamp }
+        
+        for event in sortedEvents {
+            switch event.type {
+            case .continuousTaskStarted:
+                return .running
+            case .continuousTaskPaused:
+                return .paused
+            case .continuousTaskResumed:
+                return .running
+            case .continuousTaskStopped:
+                return .stopped
+            case .continuousTaskProgress:
+                return .running
+            default:
+                continue
+            }
+        }
+        return .unknown
+    }
+}
+
+@available(iOS 26.0, *)
+struct ContinuousTaskPerformanceCard: View {
+    let taskIdentifier: String
+    let events: [BackgroundTaskEvent]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(taskIdentifier)
+                .font(.subheadline)
+                .fontWeight(.medium)
+            
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 8) {
+                MetricRow(label: "Events", value: "\(events.count)")
+                MetricRow(label: "Restarts", value: "\(resumeCount)")
+                MetricRow(label: "Avg Duration", value: averageDuration)
+                MetricRow(label: "Last Seen", value: lastEventTime)
+            }
+        }
+        .padding()
+        .background(Color(.tertiarySystemBackground))
+        .cornerRadius(8)
+    }
+    
+    private var resumeCount: Int {
+        events.filter { $0.type == .continuousTaskResumed }.count
+    }
+    
+    private var averageDuration: String {
+        let durations = events.compactMap { $0.duration }
+        guard !durations.isEmpty else { return "N/A" }
+        let average = durations.reduce(0, +) / Double(durations.count)
+        return String(format: "%.1fs", average)
+    }
+    
+    private var lastEventTime: String {
+        guard let lastEvent = events.max(by: { $0.timestamp < $1.timestamp }) else { return "N/A" }
+        return lastEvent.timestamp.formatted(.relative(presentation: .numeric))
+    }
+}
+
+@available(iOS 26.0, *)
+enum ContinuousTaskDisplayStatus {
+    case running, paused, stopped, unknown
+    
+    var displayName: String {
+        switch self {
+        case .running: return "Running"
+        case .paused: return "Paused"
+        case .stopped: return "Stopped"
+        case .unknown: return "Unknown"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .running: return .green
+        case .paused: return .yellow
+        case .stopped: return .red
+        case .unknown: return .gray
         }
     }
 }
@@ -538,6 +906,36 @@ extension BackgroundTaskEventType {
             return "moon.fill"
         case .appWillEnterForeground:
             return "sun.max.fill"
+        case .continuousTaskStarted:
+            if #available(iOS 26.0, *) {
+                return "infinity.circle.fill"
+            } else {
+                return "play.fill"
+            }
+        case .continuousTaskPaused:
+            if #available(iOS 26.0, *) {
+                return "pause.circle.fill"
+            } else {
+                return "pause.fill"
+            }
+        case .continuousTaskResumed:
+            if #available(iOS 26.0, *) {
+                return "play.circle.fill"
+            } else {
+                return "play.fill"
+            }
+        case .continuousTaskStopped:
+            if #available(iOS 26.0, *) {
+                return "stop.circle.fill"
+            } else {
+                return "stop.fill"
+            }
+        case .continuousTaskProgress:
+            if #available(iOS 26.0, *) {
+                return "chart.line.uptrend.xyaxis"
+            } else {
+                return "chart.bar.fill"
+            }
         }
     }
 }
@@ -545,7 +943,36 @@ extension BackgroundTaskEventType {
 // MARK: - Enums
 
 enum DashboardTab: CaseIterable {
-    case overview, timeline, performance, errors
+    case overview, timeline, performance, errors, continuousTasks
+    
+    var title: String {
+        switch self {
+        case .overview: return "Overview"
+        case .timeline: return "Timeline"
+        case .performance: return "Performance"
+        case .errors: return "Errors"
+        case .continuousTasks: return "Continuous"
+        }
+    }
+    
+    var systemImage: String {
+        switch self {
+        case .overview: return "chart.bar.fill"
+        case .timeline: return "clock.fill"
+        case .performance: return "speedometer"
+        case .errors: return "exclamationmark.triangle.fill"
+        case .continuousTasks: return "infinity.circle.fill"
+        }
+    }
+    
+    @available(iOS 26.0, *)
+    static var allCasesForCurrentOS: [DashboardTab] {
+        return DashboardTab.allCases
+    }
+    
+    static var allCasesForLegacyOS: [DashboardTab] {
+        return [.overview, .timeline, .performance, .errors]
+    }
 }
 
 enum TimeRange: String, CaseIterable {
@@ -570,5 +997,29 @@ enum TimeRange: String, CaseIterable {
         case .last24Hours: return 86400
         case .last7Days: return 604800
         }
+    }
+}
+
+// MARK: - iOS Version Support Helpers
+
+extension UIDevice {
+    /// Returns true if the current device supports Continuous Background Tasks (iOS 26.0+)
+    static var supportsContinuousBackgroundTasks: Bool {
+        if #available(iOS 26.0, *) {
+            return true
+        }
+        return false
+    }
+}
+
+extension BackgroundTimeDashboard {
+    /// Available dashboard tabs based on current iOS version
+    private var availableTabs: [DashboardTab] {
+        if UIDevice.supportsContinuousBackgroundTasks {
+            if #available(iOS 26.0, *) {
+                return DashboardTab.allCasesForCurrentOS
+            }
+        }
+        return DashboardTab.allCasesForLegacyOS
     }
 }

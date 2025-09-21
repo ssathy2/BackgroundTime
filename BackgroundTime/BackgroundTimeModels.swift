@@ -20,6 +20,26 @@ public enum BackgroundTaskEventType: String, Codable, CaseIterable {
     case initialization = "sdk_initialization"
     case appEnteredBackground = "app_entered_background"
     case appWillEnterForeground = "app_will_enter_foreground"
+    // Continuous Background Tasks (iOS 26.0+)
+    case continuousTaskStarted = "continuous_task_started"
+    case continuousTaskPaused = "continuous_task_paused"
+    case continuousTaskResumed = "continuous_task_resumed"
+    case continuousTaskStopped = "continuous_task_stopped"
+    case continuousTaskProgress = "continuous_task_progress"
+    
+    /// Returns true if this event type is related to continuous background tasks (iOS 26.0+)
+    public var isContinuousTaskEvent: Bool {
+        if #available(iOS 26.0, *) {
+            switch self {
+            case .continuousTaskStarted, .continuousTaskPaused, .continuousTaskResumed, 
+                 .continuousTaskStopped, .continuousTaskProgress:
+                return true
+            default:
+                return false
+            }
+        }
+        return false
+    }
 }
 
 // MARK: - Background Task Event
@@ -171,4 +191,111 @@ public struct BackgroundTaskDashboardData: Codable {
     public let timeline: [TimelineDataPoint]
     public let systemInfo: SystemInfo
     public let generatedAt: Date = Date()
+}
+
+// MARK: - Continuous Background Tasks (iOS 26.0+)
+
+@available(iOS 26.0, *)
+public struct ContinuousTaskInfo: Codable, Identifiable {
+    public let id = UUID()
+    public let taskIdentifier: String
+    public let startTime: Date
+    public let currentStatus: ContinuousTaskStatus
+    public let totalRunTime: TimeInterval
+    public let pausedTime: TimeInterval
+    public let resumeCount: Int
+    public let progressUpdates: [ContinuousTaskProgress]
+    public let expectedDuration: TimeInterval?
+    public let priority: TaskPriority
+    
+    public init(
+        taskIdentifier: String,
+        startTime: Date,
+        currentStatus: ContinuousTaskStatus,
+        totalRunTime: TimeInterval = 0,
+        pausedTime: TimeInterval = 0,
+        resumeCount: Int = 0,
+        progressUpdates: [ContinuousTaskProgress] = [],
+        expectedDuration: TimeInterval? = nil,
+        priority: TaskPriority = .medium
+    ) {
+        self.taskIdentifier = taskIdentifier
+        self.startTime = startTime
+        self.currentStatus = currentStatus
+        self.totalRunTime = totalRunTime
+        self.pausedTime = pausedTime
+        self.resumeCount = resumeCount
+        self.progressUpdates = progressUpdates
+        self.expectedDuration = expectedDuration
+        self.priority = priority
+    }
+}
+
+@available(iOS 26.0, *)
+public enum ContinuousTaskStatus: String, Codable, CaseIterable {
+    case running = "running"
+    case paused = "paused" 
+    case completed = "completed"
+    case stopped = "stopped"
+    case failed = "failed"
+    
+    public var displayName: String {
+        switch self {
+        case .running: return "Running"
+        case .paused: return "Paused"
+        case .completed: return "Completed"
+        case .stopped: return "Stopped"
+        case .failed: return "Failed"
+        }
+    }
+    
+    public var isActive: Bool {
+        return self == .running || self == .paused
+    }
+}
+
+@available(iOS 26.0, *)
+public struct ContinuousTaskProgress: Codable, Identifiable {
+    public let id = UUID()
+    public let timestamp: Date
+    public let completedUnitCount: Int64
+    public let totalUnitCount: Int64
+    public let localizedDescription: String?
+    public let userInfo: [String: String]
+    
+    public var fractionCompleted: Double {
+        guard totalUnitCount > 0 else { return 0 }
+        return Double(completedUnitCount) / Double(totalUnitCount)
+    }
+    
+    public init(
+        timestamp: Date = Date(),
+        completedUnitCount: Int64,
+        totalUnitCount: Int64,
+        localizedDescription: String? = nil,
+        userInfo: [String: String] = [:]
+    ) {
+        self.timestamp = timestamp
+        self.completedUnitCount = completedUnitCount
+        self.totalUnitCount = totalUnitCount
+        self.localizedDescription = localizedDescription
+        self.userInfo = userInfo
+    }
+}
+
+@available(iOS 26.0, *)
+public enum TaskPriority: String, Codable, CaseIterable {
+    case low = "low"
+    case medium = "medium"
+    case high = "high"
+    case userInitiated = "user_initiated"
+    
+    public var displayName: String {
+        switch self {
+        case .low: return "Low"
+        case .medium: return "Medium"
+        case .high: return "High"
+        case .userInitiated: return "User Initiated"
+        }
+    }
 }

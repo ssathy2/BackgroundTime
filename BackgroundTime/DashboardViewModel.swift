@@ -14,6 +14,7 @@ class DashboardViewModel: ObservableObject {
     @Published var events: [BackgroundTaskEvent] = []
     @Published var timelineData: [TimelineDataPoint] = []
     @Published var taskMetrics: [TaskPerformanceMetrics] = []
+    @Published var continuousTasksInfo: [Any] = [] // Will be [ContinuousTaskInfo] on iOS 26+
     @Published var isLoading = false
     @Published var error: String?
     
@@ -67,6 +68,12 @@ class DashboardViewModel: ObservableObject {
                     self.events = filteredEvents.sorted(by: { $0.timestamp > $1.timestamp })
                     self.timelineData = timeline
                     self.taskMetrics = metrics
+                    
+                    // Process continuous tasks data for iOS 26+
+                    if #available(iOS 26.0, *) {
+                        self.processContinuousTasksData(from: filteredEvents)
+                    }
+                    
                     self.isLoading = false
                 }
                 
@@ -100,5 +107,107 @@ class DashboardViewModel: ObservableObject {
                 self.error = "Sync failed: \(error.localizedDescription)"
             }
         }
+    }
+    
+    // MARK: - Continuous Tasks Support (iOS 26.0+)
+    
+    @available(iOS 26.0, *)
+    private func processContinuousTasksData(from events: [BackgroundTaskEvent]) {
+        let continuousEvents = events.filter { $0.type.isContinuousTaskEvent }
+        let taskGroups = Dictionary(grouping: continuousEvents) { $0.taskIdentifier }
+        
+        var continuousTasksInfoTyped: [ContinuousTaskInfo] = []
+        
+        for (taskIdentifier, events) in taskGroups {
+            let sortedEvents = events.sorted { $0.timestamp < $1.timestamp }
+            
+            guard let firstEvent = sortedEvents.first else { continue }
+            
+            // Determine current status
+            var currentStatus: ContinuousTaskStatus = .running
+            for event in sortedEvents.reversed() {
+                switch event.type {
+                case .continuousTaskStarted:
+                    currentStatus = .running
+                    break
+                case .continuousTaskPaused:
+                    currentStatus = .paused
+                    break
+                case .continuousTaskResumed:
+                    currentStatus = .running
+                    break
+                case .continuousTaskStopped:
+                    currentStatus = .stopped
+                    break
+                default:
+                    continue
+                }
+            }
+            
+            // Calculate metrics
+            let resumeEvents = sortedEvents.filter { $0.type == .continuousTaskResumed }
+            let progressEvents = sortedEvents.filter { $0.type == .continuousTaskProgress }
+            
+            let progressUpdates = progressEvents.map { event in
+                ContinuousTaskProgress(
+                    timestamp: event.timestamp,
+                    completedUnitCount: 0, // Would extract from metadata in real implementation
+                    totalUnitCount: 100,   // Would extract from metadata in real implementation
+                    localizedDescription: event.errorMessage
+                )
+            }
+            
+            let continuousTaskInfo = ContinuousTaskInfo(
+                taskIdentifier: taskIdentifier,
+                startTime: firstEvent.timestamp,
+                currentStatus: currentStatus,
+                totalRunTime: calculateTotalRunTime(events: sortedEvents),
+                pausedTime: 0, // Would calculate from pause/resume events
+                resumeCount: resumeEvents.count,
+                progressUpdates: progressUpdates,
+                expectedDuration: sortedEvents.compactMap { $0.duration }.first,
+                priority: .medium // Would extract from metadata in real implementation
+            )
+            
+            continuousTasksInfoTyped.append(continuousTaskInfo)
+        }
+        
+        // Update the published property
+        continuousTasksInfo = continuousTasksInfoTyped
+    }
+    
+    @available(iOS 26.0, *)
+    private func calculateTotalRunTime(events: [BackgroundTaskEvent]) -> TimeInterval {
+        // This is a simplified calculation - in a real implementation you'd track
+        // the time between start/pause and resume/stop events
+        var totalRunTime: TimeInterval = 0
+        var currentStartTime: Date?
+        
+        for event in events.sorted(by: { $0.timestamp < $1.timestamp }) {
+            switch event.type {
+            case .continuousTaskStarted, .continuousTaskResumed:
+                currentStartTime = event.timestamp
+            case .continuousTaskPaused, .continuousTaskStopped:
+                if let startTime = currentStartTime {
+                    totalRunTime += event.timestamp.timeIntervalSince(startTime)
+                    currentStartTime = nil
+                }
+            default:
+                break
+            }
+        }
+        
+        // If task is still running, add time since last start
+        if let startTime = currentStartTime {
+            totalRunTime += Date().timeIntervalSince(startTime)
+        }
+        
+        return totalRunTime
+    }
+    
+    /// Returns continuous tasks info with proper typing for iOS 26+
+    @available(iOS 26.0, *)
+    var continuousTasksInfoTyped: [ContinuousTaskInfo] {
+        return continuousTasksInfo.compactMap { $0 as? ContinuousTaskInfo }
     }
 }

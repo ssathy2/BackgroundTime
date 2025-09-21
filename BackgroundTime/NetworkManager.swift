@@ -12,7 +12,7 @@ import os.log
 
 class NetworkManager {
     static let shared = NetworkManager()
-    
+        
     private let logger = Logger(subsystem: "BackgroundTime", category: "Network")
     private var apiEndpoint: URL?
     private let session = URLSession(configuration: .default)
