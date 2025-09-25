@@ -133,21 +133,18 @@ struct CircularBufferTests {
             buffer.append("item\(i)")
         }
         
-        let resizedBuffer = buffer.toArray()
-        let beforeResize = buffer
-        #expect(beforeResize.toArray().count == 5)
+        let beforeResize = buffer.toArray()
+        #expect(beforeResize.count == 5)
+        #expect(beforeResize == ["item3", "item4", "item5", "item6", "item7"])
         
-        // Resize to smaller capacity (now returns a new buffer)
+        // Resize to smaller capacity - modifies buffer in place
         buffer.resize(to: 3)
-        let afterResize = resizedBuffer
+        let afterResize = buffer.toArray()
         
         #expect(afterResize.count == 3)
-        #expect(resizedBuffer.capacity == 3)
+        #expect(buffer.capacity == 3)
         // Should keep the most recent elements
         #expect(afterResize == ["item5", "item6", "item7"])
-        
-        // Original buffer should be unchanged
-        #expect(buffer.capacity == 5)
     }
     
     @Test("Buffer thread safety simulation")

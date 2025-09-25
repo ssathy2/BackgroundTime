@@ -1,0 +1,31 @@
+{
+  "configurations" : [
+    {
+      "id" : "CDD7B5E2-6E8C-4F8A-9E8C-1234567890CD",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:BackgroundTime.xcodeproj",
+        "identifier" : "DE48B6C92E7E614A009A676E",
+        "name" : "BackgroundTimeExampleTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:BackgroundTime.xcodeproj",
+        "identifier" : "DE48B6D32E7E614A009A676E",
+        "name" : "BackgroundTimeExampleUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

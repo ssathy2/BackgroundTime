@@ -55,7 +55,7 @@ struct CircularBufferFixVerificationTests {
         #expect(contents == ["second", "third"])
     }
     
-    @Test("Buffer resize creates new buffer")
+    @Test("Buffer resize modifies buffer in place")
     func testResizeReturnsNewBuffer() async throws {
         let originalBuffer = CircularBuffer<Int>(capacity: 5)
         
@@ -63,14 +63,14 @@ struct CircularBufferFixVerificationTests {
         originalBuffer.append(20)
         originalBuffer.append(30)
         
-        let _originalBuffer = originalBuffer
+        // Before resize
+        #expect(originalBuffer.capacity == 5)
+        #expect(originalBuffer.toArray() == [10, 20, 30])
+        
+        // Resize modifies buffer in place
         originalBuffer.resize(to: 2)
         
-        // Original buffer should be unchanged
-        #expect(_originalBuffer.capacity == 5)
-        #expect(_originalBuffer.toArray() == [10, 20, 30])
-        
-        // New buffer should have different capacity and keep most recent elements
+        // Buffer should have new capacity and keep most recent elements
         #expect(originalBuffer.capacity == 2)
         #expect(originalBuffer.toArray() == [20, 30])
     }

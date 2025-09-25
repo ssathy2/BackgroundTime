@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		DE3028342E85931C007DD928 /* BackgroundTimeSDK.xctestplan in Resources */ = {isa = PBXBuildFile; fileRef = DE3028332E85931C007DD928 /* BackgroundTimeSDK.xctestplan */; };
+		DE3028362E859320007DD928 /* BackgroundTimeExample.xctestplan in Resources */ = {isa = PBXBuildFile; fileRef = DE3028352E859320007DD928 /* BackgroundTimeExample.xctestplan */; };
 		DE48B6AA2E7E6128009A676E /* BackgroundTime.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DE48B69E2E7E6128009A676E /* BackgroundTime.framework */; };
 		DE48B6E62E7E615D009A676E /* BackgroundTime.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DE48B69E2E7E6128009A676E /* BackgroundTime.framework */; };
 		DE48B6E72E7E615D009A676E /* BackgroundTime.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = DE48B69E2E7E6128009A676E /* BackgroundTime.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -58,7 +60,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		DE0A69392E858D8C00E8F2DC /* BackgroundTime.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = BackgroundTime.xctestplan; sourceTree = "<group>"; };
+		DE3028332E85931C007DD928 /* BackgroundTimeSDK.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = BackgroundTimeSDK.xctestplan; sourceTree = "<group>"; };
+		DE3028352E859320007DD928 /* BackgroundTimeExample.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = BackgroundTimeExample.xctestplan; sourceTree = "<group>"; };
 		DE48B69E2E7E6128009A676E /* BackgroundTime.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BackgroundTime.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		DE48B6A92E7E6128009A676E /* BackgroundTimeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BackgroundTimeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DE48B6BC2E7E6148009A676E /* BackgroundTimeExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BackgroundTimeExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -154,7 +157,8 @@
 		DE48B6942E7E6128009A676E = {
 			isa = PBXGroup;
 			children = (
-				DE0A69392E858D8C00E8F2DC /* BackgroundTime.xctestplan */,
+				DE3028332E85931C007DD928 /* BackgroundTimeSDK.xctestplan */,
+				DE3028352E859320007DD928 /* BackgroundTimeExample.xctestplan */,
 				DE48B6A02E7E6128009A676E /* BackgroundTime */,
 				DE48B6AD2E7E6128009A676E /* BackgroundTimeTests */,
 				DE48B6BD2E7E6148009A676E /* BackgroundTimeExample */,
@@ -400,6 +404,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DE3028362E859320007DD928 /* BackgroundTimeExample.xctestplan in Resources */,
+				DE3028342E85931C007DD928 /* BackgroundTimeSDK.xctestplan in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -31,8 +31,11 @@ class BGTaskSwizzler {
         let originalExpirationHandler = task.expirationHandler
         task.expirationHandler = {
             let endTime = Date()
-            let duration = taskQueue.sync {
-                taskStartTimes[task.identifier].map { endTime.timeIntervalSince($0) }
+            let duration: TimeInterval? = taskQueue.sync {
+                if let startTime = taskStartTimes[task.identifier] {
+                    return endTime.timeIntervalSince(startTime)
+                }
+                return nil
             }
             
             let event = BackgroundTaskEvent(
@@ -85,8 +88,11 @@ extension BGTask {
     @objc dynamic func bt_setTaskCompleted(success: Bool) {
         let endTime = Date()
         
-        let duration = BGTaskSwizzler.taskQueue.sync {
-            BGTaskSwizzler.taskStartTimes[self.identifier].map { endTime.timeIntervalSince($0) }
+        let duration: TimeInterval? = BGTaskSwizzler.taskQueue.sync {
+            if let startTime = BGTaskSwizzler.taskStartTimes[self.identifier] {
+                return endTime.timeIntervalSince(startTime)
+            }
+            return nil
         }
         
         let event = BackgroundTaskEvent(
