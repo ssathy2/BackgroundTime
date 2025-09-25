@@ -63,15 +63,16 @@ struct CircularBufferFixVerificationTests {
         originalBuffer.append(20)
         originalBuffer.append(30)
         
-        let resizedBuffer = originalBuffer.resize(to: 2)
+        let _originalBuffer = originalBuffer
+        originalBuffer.resize(to: 2)
         
         // Original buffer should be unchanged
-        #expect(originalBuffer.capacity == 5)
-        #expect(originalBuffer.toArray() == [10, 20, 30])
+        #expect(_originalBuffer.capacity == 5)
+        #expect(_originalBuffer.toArray() == [10, 20, 30])
         
         // New buffer should have different capacity and keep most recent elements
-        #expect(resizedBuffer.capacity == 2)
-        #expect(resizedBuffer.toArray() == [20, 30])
+        #expect(originalBuffer.capacity == 2)
+        #expect(originalBuffer.toArray() == [20, 30])
     }
     
     @Test("Buffer clear operation")

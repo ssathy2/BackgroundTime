@@ -133,12 +133,13 @@ struct CircularBufferTests {
             buffer.append("item\(i)")
         }
         
-        let beforeResize = buffer.toArray()
-        #expect(beforeResize.count == 5)
+        let resizedBuffer = buffer.toArray()
+        let beforeResize = buffer
+        #expect(beforeResize.toArray().count == 5)
         
         // Resize to smaller capacity (now returns a new buffer)
-        let resizedBuffer = buffer.resize(to: 3)
-        let afterResize = resizedBuffer.toArray()
+        buffer.resize(to: 3)
+        let afterResize = resizedBuffer
         
         #expect(afterResize.count == 3)
         #expect(resizedBuffer.capacity == 3)

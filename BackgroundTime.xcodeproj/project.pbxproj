@@ -58,6 +58,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		DE0A69392E858D8C00E8F2DC /* BackgroundTime.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = BackgroundTime.xctestplan; sourceTree = "<group>"; };
 		DE48B69E2E7E6128009A676E /* BackgroundTime.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BackgroundTime.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		DE48B6A92E7E6128009A676E /* BackgroundTimeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BackgroundTimeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DE48B6BC2E7E6148009A676E /* BackgroundTimeExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BackgroundTimeExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -153,6 +154,7 @@
 		DE48B6942E7E6128009A676E = {
 			isa = PBXGroup;
 			children = (
+				DE0A69392E858D8C00E8F2DC /* BackgroundTime.xctestplan */,
 				DE48B6A02E7E6128009A676E /* BackgroundTime */,
 				DE48B6AD2E7E6128009A676E /* BackgroundTimeTests */,
 				DE48B6BD2E7E6148009A676E /* BackgroundTimeExample */,

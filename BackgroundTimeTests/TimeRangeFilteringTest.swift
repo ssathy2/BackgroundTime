@@ -8,7 +8,7 @@
 import Testing
 import Foundation
 @testable import BackgroundTime
-internal import UIKit
+import UIKit
 
 @Suite("Time Range Filtering Tests")
 struct TimeRangeFilteringTests {
@@ -128,7 +128,7 @@ struct TimeRangeFilteringTests {
     
     @Test("Dashboard view model respects time range selection")
     func testViewModelTimeRangeFiltering() async throws {
-        let viewModel = DashboardViewModel()
+        let viewModel = await DashboardViewModel()
         let dataStore = BackgroundTaskDataStore.shared
         
         // Clear existing data
@@ -174,15 +174,17 @@ struct TimeRangeFilteringTests {
         
         // Test 1 hour filter - should only show recent event
         await viewModel.loadData(for: .last1Hour)
-        #expect(viewModel.events.count == 1, "Should show 1 event for 1 hour range")
-        #expect(viewModel.events.first?.taskIdentifier == "recent-task", "Should show the recent task")
+        let events1h = await MainActor.run { viewModel.events }
+        #expect(events1h.count == 1, "Should show 1 event for 1 hour range")
+        #expect(events1h.first?.taskIdentifier == "recent-task", "Should show the recent task")
         
         // Test 7 days filter - should show both events
         await viewModel.loadData(for: .last7Days)
-        #expect(viewModel.events.count == 2, "Should show 2 events for 7 days range")
+        let events7d = await MainActor.run { viewModel.events }
+        #expect(events7d.count == 2, "Should show 2 events for 7 days range")
         
         // Verify statistics are filtered correctly
-        let stats1h = viewModel.statistics
+        let stats1h = await viewModel.statistics
         #expect(stats1h?.totalTasksExecuted == 1, "Statistics should reflect filtered data")
         
         // Clean up

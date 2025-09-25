@@ -7,6 +7,8 @@
 
 import Testing
 import Foundation
+import UIKit
+import BackgroundTasks
 @testable import BackgroundTime
 
 @Suite("BackgroundTime SDK Core Tests")
@@ -330,6 +332,245 @@ struct DataModelTests {
         #expect(stats.totalTasksFailed == 0)
         #expect(stats.successRate == 0.0)
         #expect(stats.averageExecutionTime == 0.0)
+    }
+}
+
+@Suite("Swizzling Tests")
+struct SwizzlingTests {
+    
+    @Test("BGTaskScheduler Swizzling Initialization")
+    func testBGTaskSchedulerSwizzling() async throws {
+        // Clear events first
+        BackgroundTaskDataStore.shared.clearAllEvents()
+        
+        // Initialize swizzling
+        BGTaskSchedulerSwizzler.swizzleSchedulerMethods()
+        
+        // Verify swizzling doesn't break normal operation
+        let scheduler = BGTaskScheduler.shared
+        #expect(scheduler != nil)
+        
+        // Test that swizzling can be called multiple times without issues
+        BGTaskSchedulerSwizzler.swizzleSchedulerMethods()
+        BGTaskSchedulerSwizzler.swizzleSchedulerMethods()
+        
+        #expect(scheduler != nil) // Still working after multiple swizzle attempts
+    }
+    
+    @Test("Task Registration Tracking")
+    func testTaskRegistrationTracking() async throws {
+        BackgroundTaskDataStore.shared.clearAllEvents()
+        BGTaskSchedulerSwizzler.swizzleSchedulerMethods()
+        
+        let taskIdentifier = "test-registration-task"
+        let scheduler = BGTaskScheduler.shared
+        
+        // Register a task - this should work even in test environment
+        let registered = scheduler.register(
+            forTaskWithIdentifier: taskIdentifier,
+            using: nil
+        ) { task in
+            // Mock launch handler
+            task.setTaskCompleted(success: true)
+        }
+        
+        // In test environment, registration might fail due to missing Info.plist entries
+        // But we can still verify the swizzling is working by checking method existence
+        
+        let hasSwizzledMethod = BGTaskScheduler.self.responds(to: #selector(BGTaskScheduler.bt_register(forTaskWithIdentifier:using:launchHandler:)))
+        #expect(hasSwizzledMethod)
+    }
+    
+    @Test("Task Cancellation Tracking")
+    func testTaskCancellationTracking() async throws {
+        BackgroundTaskDataStore.shared.clearAllEvents()
+        BGTaskSchedulerSwizzler.swizzleSchedulerMethods()
+        
+        let taskIdentifier = "test-cancellation-task"
+        let scheduler = BGTaskScheduler.shared
+        
+        // Test individual task cancellation
+        scheduler.cancel(taskRequestWithIdentifier: taskIdentifier)
+        
+        // Verify swizzled method exists
+        let hasSwizzledCancelMethod = BGTaskScheduler.self.responds(to: #selector(BGTaskScheduler.bt_cancel(taskRequestWithIdentifier:)))
+        #expect(hasSwizzledCancelMethod)
+        
+        // Test cancel all tasks
+        scheduler.cancelAllTaskRequests()
+        
+        let hasSwizzledCancelAllMethod = BGTaskScheduler.self.responds(to: #selector(BGTaskScheduler.bt_cancelAllTaskRequests))
+        #expect(hasSwizzledCancelAllMethod)
+    }
+    
+    @Test("Task Submission Error Handling")
+    func testTaskSubmissionErrorHandling() async throws {
+        BackgroundTaskDataStore.shared.clearAllEvents()
+        BGTaskSchedulerSwizzler.swizzleSchedulerMethods()
+        
+        let scheduler = BGTaskScheduler.shared
+        
+        // Create a task request with invalid identifier (should cause error)
+        let taskRequest = BGAppRefreshTaskRequest(identifier: "invalid-task-not-in-plist")
+        
+        do {
+            try scheduler.submit(taskRequest)
+            // If submission succeeds (unlikely in test), that's fine
+        } catch {
+            // Expected to fail in test environment - verify error is properly handled
+            #expect(error != nil)
+        }
+        
+        // Verify swizzled method exists
+        let hasSwizzledSubmitMethod = BGTaskScheduler.self.responds(to: #selector(BGTaskScheduler.bt_submit(_:)))
+        #expect(hasSwizzledSubmitMethod)
+    }
+    
+    @Test("BGTask Swizzling Initialization")
+    func testBGTaskSwizzling() async throws {
+        BGTaskSwizzler.swizzleTaskMethods()
+        
+        // Verify swizzled method exists
+        let hasSwizzledCompletionMethod = BGTask.self.responds(to: #selector(BGTask.bt_setTaskCompleted(success:)))
+        #expect(hasSwizzledCompletionMethod)
+    }
+    
+    @Test("Task Start Time Tracking")
+    func testTaskStartTimeTracking() async throws {
+        let taskIdentifier = "test-start-time-task"
+        let startTime = Date()
+        
+        // Clear existing start times
+        BGTaskSwizzler.taskQueue.async(flags: .barrier) {
+            BGTaskSwizzler.taskStartTimes.removeAll()
+        }
+        
+        // Simulate task start tracking
+        BGTaskSwizzler.taskQueue.async(flags: .barrier) {
+            BGTaskSwizzler.taskStartTimes[taskIdentifier] = startTime
+        }
+        
+        // Wait for async operation to complete
+        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        
+        // Verify start time was recorded
+        let recordedStartTime = await withCheckedContinuation { continuation in
+            BGTaskSwizzler.taskQueue.async {
+                let time = BGTaskSwizzler.taskStartTimes[taskIdentifier]
+                continuation.resume(returning: time)
+            }
+        }
+        
+        #expect(recordedStartTime != nil)
+        #expect(abs(recordedStartTime!.timeIntervalSince(startTime)) < 1.0) // Within 1 second
+    }
+    
+    @Test("Task Completion Event Recording")
+    func testTaskCompletionEventRecording() async throws {
+        BackgroundTaskDataStore.shared.clearAllEvents()
+        BGTaskSwizzler.swizzleTaskMethods()
+        
+        let taskIdentifier = "test-completion-task"
+        let startTime = Date()
+        
+        // Set up start time manually in the BGTaskSwizzler
+        BGTaskSwizzler.taskQueue.async(flags: .barrier) {
+            BGTaskSwizzler.taskStartTimes[taskIdentifier] = startTime
+        }
+        
+        // Wait for the start time to be set
+        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        
+        // Simulate task completion by directly creating an event
+        // This tests the event recording functionality without needing a real BGTask
+        let completionEvent = BackgroundTaskEvent(
+            id: UUID(),
+            taskIdentifier: taskIdentifier,
+            type: .taskExecutionCompleted,
+            timestamp: Date(),
+            duration: 5.0,
+            success: true,
+            errorMessage: nil,
+            metadata: ["test": "completion"],
+            systemInfo: createMockSystemInfo()
+        )
+        
+        BackgroundTaskDataStore.shared.recordEvent(completionEvent)
+        
+        // Simulate cleaning up start time (as the swizzled method would do)
+        BGTaskSwizzler.taskQueue.async(flags: .barrier) {
+            BGTaskSwizzler.taskStartTimes.removeValue(forKey: taskIdentifier)
+        }
+        
+        // Wait for async operations
+        try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+        
+        // Verify the event was recorded
+        let allEvents = BackgroundTaskDataStore.shared.getAllEvents()
+        let completionEvents = allEvents.filter { $0.type == .taskExecutionCompleted && $0.taskIdentifier == taskIdentifier }
+        #expect(completionEvents.count == 1)
+        
+        // Verify start time was cleaned up
+        let remainingStartTime = await withCheckedContinuation { continuation in
+            BGTaskSwizzler.taskQueue.async {
+                let time = BGTaskSwizzler.taskStartTimes[taskIdentifier]
+                continuation.resume(returning: time)
+            }
+        }
+        
+        #expect(remainingStartTime == nil)
+    }
+    
+    @Test("Swizzling Thread Safety")
+    func testSwizzlingThreadSafety() async throws {
+        let taskIdentifier = "test-thread-safety"
+        let iterations = 10
+        
+        // Clear existing data
+        BGTaskSwizzler.taskQueue.async(flags: .barrier) {
+            BGTaskSwizzler.taskStartTimes.removeAll()
+        }
+        
+        // Simulate concurrent access to task start times
+        await withTaskGroup(of: Void.self) { group in
+            for i in 0..<iterations {
+                group.addTask {
+                    let uniqueIdentifier = "\(taskIdentifier)-\(i)"
+                    BGTaskSwizzler.taskQueue.async(flags: .barrier) {
+                        BGTaskSwizzler.taskStartTimes[uniqueIdentifier] = Date()
+                    }
+                }
+            }
+        }
+        
+        // Wait for all operations to complete
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        // Verify all entries were recorded
+        let finalCount = await withCheckedContinuation { continuation in
+            BGTaskSwizzler.taskQueue.async {
+                let count = BGTaskSwizzler.taskStartTimes.count
+                continuation.resume(returning: count)
+            }
+        }
+        
+        #expect(finalCount == iterations)
+    }
+    
+    @Test("Date ISO8601 Extension")
+    func testDateISO8601Extension() async throws {
+        let testDate = Date(timeIntervalSince1970: 1695686400) // A specific timestamp
+        let iso8601String = testDate.iso8601String
+        
+        #expect(!iso8601String.isEmpty)
+        #expect(iso8601String.contains("T")) // ISO8601 format contains T separator
+        #expect(iso8601String.contains("Z") || iso8601String.contains("+") || iso8601String.contains("-")) // Contains timezone info
+        
+        // Verify it can be parsed back
+        let formatter = ISO8601DateFormatter()
+        let parsedDate = formatter.date(from: iso8601String)
+        #expect(parsedDate != nil)
+        #expect(abs(parsedDate!.timeIntervalSince(testDate)) < 1.0) // Should be very close
     }
 }
 

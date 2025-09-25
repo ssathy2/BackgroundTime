@@ -2,133 +2,142 @@
 //  BGTaskSchedulerSwizzler.swift
 //  BackgroundTime
 //
-//  Created by Siddharth Sathyam on 9/25/25.
+//  Created by Siddharth Sathyam on 9/19/25.
 //
 
 import Foundation
 import BackgroundTasks
-import UIKit
 import os.log
+import UIKit
 
 // MARK: - BGTaskScheduler Method Swizzling
 
-@objc class BGTaskSchedulerSwizzler: NSObject {
+class BGTaskSchedulerSwizzler {
     private static let logger = Logger(subsystem: "BackgroundTime", category: "Swizzler")
-    private static let dataStore = BackgroundTaskDataStore.shared
-    private static var swizzlingCompleted = false
-    private static let swizzlingQueue = DispatchQueue(label: "BackgroundTime.Swizzling", qos: .utility)
+    private static var isSwizzled = false
     
-    // Store original method implementations
-    private static var originalSubmit: Method?
-    private static var originalCancel: Method?
-    private static var originalCancelAll: Method?
-    
-    @objc static func swizzleSchedulerMethods() {
-        swizzlingQueue.sync {
-            guard !swizzlingCompleted else {
-                logger.warning("BGTaskScheduler swizzling already completed")
-                return
-            }
-            
-            guard let schedulerClass = NSClassFromString("BGTaskScheduler") else {
-                logger.error("Failed to get BGTaskScheduler class")
-                return
-            }
-            
-            // Swizzle submit method
-            originalSubmit = swizzleMethod(
-                in: schedulerClass,
-                original: #selector(BGTaskScheduler.submit(_:)),
-                swizzled: #selector(BGTaskSchedulerSwizzler.swizzled_submit(_:))
-            )
-            
-            // Swizzle cancel method
-            originalCancel = swizzleMethod(
-                in: schedulerClass,
-                original: #selector(BGTaskScheduler.cancel(taskRequestWithIdentifier:)),
-                swizzled: #selector(BGTaskSchedulerSwizzler.swizzled_cancel(taskRequestWithIdentifier:))
-            )
-            
-            // Swizzle cancelAll method
-            originalCancelAll = swizzleMethod(
-                in: schedulerClass,
-                original: #selector(BGTaskScheduler.cancelAllTaskRequests),
-                swizzled: #selector(BGTaskSchedulerSwizzler.swizzled_cancelAllTaskRequests)
-            )
-            
-            swizzlingCompleted = true
-            logger.info("BGTaskScheduler method swizzling completed successfully")
-        }
+    static func swizzleSchedulerMethods() {
+        guard !isSwizzled else { return }
+        
+        // Swizzle submit method
+        swizzleSubmitMethod()
+        
+        // Swizzle cancel methods
+        swizzleCancelMethods()
+        
+        // Swizzle register method
+        swizzleRegisterMethod()
+        
+        isSwizzled = true
+        logger.info("BGTaskScheduler methods swizzled successfully")
     }
     
-    // MARK: - Swizzled Methods
-    
-    @objc func swizzled_submit(_ request: BGTaskRequest) throws {
-        let startTime = CFAbsoluteTimeGetCurrent()
+    private static func swizzleSubmitMethod() {
+        let originalSelector = #selector(BGTaskScheduler.submit(_:))
+        let swizzledSelector = #selector(BGTaskScheduler.bt_submit(_:))
         
-        var submitError: Error?
-        var success = false
-        
-        // The cleanest approach: Use the original implementation we stored during swizzling
-        do {
-            guard let originalMethod = BGTaskSchedulerSwizzler.originalSubmit else {
-                throw NSError(domain: "BGTaskSchedulerSwizzler", code: -1, userInfo: [NSLocalizedDescriptionKey: "Original submit method not available"])
-            }
-            
-            let scheduler = BGTaskScheduler.shared
-            let originalImplementation = method_getImplementation(originalMethod)
-            
-            // Use the original implementation directly with objc_msgSend-style calling
-            // This avoids the @convention(c) issue with throwing functions
-            let originalFunction = unsafeBitCast(originalImplementation, to: (@convention(c) (AnyObject, Selector, BGTaskRequest) -> Void).self)
-            
-            // Call the original implementation directly
-            originalFunction(scheduler, #selector(BGTaskScheduler.submit(_:)), request)
-            success = true
-            
-        } catch {
-            submitError = error
-            success = false
-            throw error
-        }
-        
-        // Record the event
-        let duration = CFAbsoluteTimeGetCurrent() - startTime
-        let event = BackgroundTaskEvent(
-            id: UUID(),
-            taskIdentifier: request.identifier,
-            type: .taskScheduled,
-            timestamp: Date(),
-            duration: duration,
-            success: success,
-            errorMessage: submitError?.localizedDescription,
-            metadata: [
-                "request_type": String(describing: type(of: request)),
-                "earliest_begin_date": request.earliestBeginDate?.iso8601String ?? "nil",
-                "requires_network": (request as? BGProcessingTaskRequest)?.requiresNetworkConnectivity ?? false,
-                "requires_power": (request as? BGProcessingTaskRequest)?.requiresExternalPower ?? false
-            ],
-            systemInfo: SystemInfo.current()
-        )
-        
-        BGTaskSchedulerSwizzler.dataStore.recordEvent(event)
-        BGTaskSchedulerSwizzler.logger.info("Recorded task submission for: \(request.identifier)")
-    }
-    
-    @objc func swizzled_cancel(taskRequestWithIdentifier identifier: String) {
-        // Call original implementation using stored method
-        guard let originalMethod = BGTaskSchedulerSwizzler.originalCancel else {
-            BGTaskSchedulerSwizzler.logger.error("Original cancel method not available")
+        guard let originalMethod = class_getInstanceMethod(BGTaskScheduler.self, originalSelector),
+              let swizzledMethod = class_getInstanceMethod(BGTaskScheduler.self, swizzledSelector) else {
+            logger.error("Failed to get methods for submit swizzling")
             return
         }
         
-        let originalImplementation = method_getImplementation(originalMethod)
-        typealias CancelFunction = @convention(c) (AnyObject, Selector, String) -> Void
-        let originalFunction = unsafeBitCast(originalImplementation, to: CancelFunction.self)
+        method_exchangeImplementations(originalMethod, swizzledMethod)
+    }
+    
+    private static func swizzleCancelMethods() {
+        // Cancel with identifier
+        let cancelSelector = #selector(BGTaskScheduler.cancel(taskRequestWithIdentifier:))
+        let swizzledCancelSelector = #selector(BGTaskScheduler.bt_cancel(taskRequestWithIdentifier:))
         
-        originalFunction(self, #selector(BGTaskScheduler.cancel(taskRequestWithIdentifier:)), identifier)
+        guard let cancelMethod = class_getInstanceMethod(BGTaskScheduler.self, cancelSelector),
+              let swizzledCancelMethod = class_getInstanceMethod(BGTaskScheduler.self, swizzledCancelSelector) else {
+            logger.error("Failed to get methods for cancel swizzling")
+            return
+        }
         
-        // Record the event
+        method_exchangeImplementations(cancelMethod, swizzledCancelMethod)
+        
+        // Cancel all tasks
+        let cancelAllSelector = #selector(BGTaskScheduler.cancelAllTaskRequests)
+        let swizzledCancelAllSelector = #selector(BGTaskScheduler.bt_cancelAllTaskRequests)
+        
+        guard let cancelAllMethod = class_getInstanceMethod(BGTaskScheduler.self, cancelAllSelector),
+              let swizzledCancelAllMethod = class_getInstanceMethod(BGTaskScheduler.self, swizzledCancelAllSelector) else {
+            logger.error("Failed to get methods for cancelAll swizzling")
+            return
+        }
+        
+        method_exchangeImplementations(cancelAllMethod, swizzledCancelAllMethod)
+    }
+    
+    private static func swizzleRegisterMethod() {
+        let registerSelector = #selector(BGTaskScheduler.register(forTaskWithIdentifier:using:launchHandler:))
+        let swizzledRegisterSelector = #selector(BGTaskScheduler.bt_register(forTaskWithIdentifier:using:launchHandler:))
+        
+        guard let registerMethod = class_getInstanceMethod(BGTaskScheduler.self, registerSelector),
+              let swizzledRegisterMethod = class_getInstanceMethod(BGTaskScheduler.self, swizzledRegisterSelector) else {
+            logger.error("Failed to get methods for register swizzling")
+            return
+        }
+        
+        method_exchangeImplementations(registerMethod, swizzledRegisterMethod)
+    }
+}
+
+// MARK: - BGTaskScheduler Extensions
+
+extension BGTaskScheduler {
+    @objc dynamic func bt_submit(_ taskRequest: BGTaskRequest) throws {
+        let startTime = Date()
+        
+        // Record the scheduling attempt
+        let event = BackgroundTaskEvent(
+            id: UUID(),
+            taskIdentifier: taskRequest.identifier,
+            type: .taskScheduled,
+            timestamp: startTime,
+            duration: nil,
+            success: true,
+            errorMessage: nil,
+            metadata: [
+                "earliestBeginDate": taskRequest.earliestBeginDate?.iso8601String ?? "none",
+                "requiresNetworkConnectivity": taskRequest is BGAppRefreshTaskRequest ? false : (taskRequest as? BGProcessingTaskRequest)?.requiresNetworkConnectivity ?? false,
+                "requiresExternalPower": taskRequest is BGAppRefreshTaskRequest ? false : (taskRequest as? BGProcessingTaskRequest)?.requiresExternalPower ?? false
+            ],
+            systemInfo: SystemInfo(
+                backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
+                deviceModel: UIDevice.current.model,
+                systemVersion: UIDevice.current.systemVersion,
+                lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                batteryLevel: UIDevice.current.batteryLevel,
+                batteryState: UIDevice.current.batteryState
+            )
+        )
+        
+        // Try to submit the task and handle any errors
+        do {
+            try self.bt_submit(taskRequest) // Call original method
+            BackgroundTaskDataStore.shared.recordEvent(event)
+        } catch {
+            // Record the failure
+            let failureEvent = BackgroundTaskEvent(
+                id: UUID(),
+                taskIdentifier: taskRequest.identifier,
+                type: .taskFailed,
+                timestamp: Date(),
+                duration: Date().timeIntervalSince(startTime),
+                success: false,
+                errorMessage: error.localizedDescription,
+                metadata: event.metadata,
+                systemInfo: event.systemInfo
+            )
+            BackgroundTaskDataStore.shared.recordEvent(failureEvent)
+            throw error
+        }
+    }
+    
+    @objc dynamic func bt_cancel(taskRequestWithIdentifier identifier: String) {
         let event = BackgroundTaskEvent(
             id: UUID(),
             taskIdentifier: identifier,
@@ -137,28 +146,22 @@ import os.log
             duration: nil,
             success: true,
             errorMessage: nil,
-            metadata: [:],
-            systemInfo: SystemInfo.current()
+            metadata: ["reason": "manual_cancellation"],
+            systemInfo: SystemInfo(
+                backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
+                deviceModel: UIDevice.current.model,
+                systemVersion: UIDevice.current.systemVersion,
+                lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                batteryLevel: UIDevice.current.batteryLevel,
+                batteryState: UIDevice.current.batteryState
+            )
         )
         
-        BGTaskSchedulerSwizzler.dataStore.recordEvent(event)
-        BGTaskSchedulerSwizzler.logger.info("Recorded task cancellation for: \(identifier)")
+        BackgroundTaskDataStore.shared.recordEvent(event)
+        self.bt_cancel(taskRequestWithIdentifier: identifier) // Call original method
     }
     
-    @objc func swizzled_cancelAllTaskRequests() {
-        // Call original implementation using stored method
-        guard let originalMethod = BGTaskSchedulerSwizzler.originalCancelAll else {
-            BGTaskSchedulerSwizzler.logger.error("Original cancelAll method not available")
-            return
-        }
-        
-        let originalImplementation = method_getImplementation(originalMethod)
-        typealias CancelAllFunction = @convention(c) (AnyObject, Selector) -> Void
-        let originalFunction = unsafeBitCast(originalImplementation, to: CancelAllFunction.self)
-        
-        originalFunction(self, #selector(BGTaskScheduler.cancelAllTaskRequests))
-        
-        // Record the event
+    @objc dynamic func bt_cancelAllTaskRequests() {
         let event = BackgroundTaskEvent(
             id: UUID(),
             taskIdentifier: "ALL_TASKS",
@@ -167,67 +170,63 @@ import os.log
             duration: nil,
             success: true,
             errorMessage: nil,
-            metadata: ["cancel_type": "all_tasks"],
-            systemInfo: SystemInfo.current()
+            metadata: ["reason": "cancel_all_tasks"],
+            systemInfo: SystemInfo(
+                backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
+                deviceModel: UIDevice.current.model,
+                systemVersion: UIDevice.current.systemVersion,
+                lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                batteryLevel: UIDevice.current.batteryLevel,
+                batteryState: UIDevice.current.batteryState
+            )
         )
         
-        BGTaskSchedulerSwizzler.dataStore.recordEvent(event)
-        BGTaskSchedulerSwizzler.logger.info("Recorded cancellation of all background tasks")
+        BackgroundTaskDataStore.shared.recordEvent(event)
+        self.bt_cancelAllTaskRequests() // Call original method
     }
     
-    // MARK: - Helper Methods
-    
-    private static func swizzleMethod(in targetClass: AnyClass, original originalSelector: Selector, swizzled swizzledSelector: Selector) -> Method? {
-        guard let originalMethod = class_getInstanceMethod(targetClass, originalSelector),
-              let swizzledMethod = class_getInstanceMethod(BGTaskSchedulerSwizzler.self, swizzledSelector) else {
-            logger.error("Failed to get methods for swizzling")
-            return nil
-        }
-        
-        let didAddMethod = class_addMethod(
-            targetClass,
-            originalSelector,
-            method_getImplementation(swizzledMethod),
-            method_getTypeEncoding(swizzledMethod)
-        )
-        
-        if didAddMethod {
-            class_replaceMethod(
-                targetClass,
-                swizzledSelector,
-                method_getImplementation(originalMethod),
-                method_getTypeEncoding(originalMethod)
+    @objc dynamic func bt_register(forTaskWithIdentifier identifier: String, using queue: DispatchQueue?, launchHandler: @escaping (BGTask) -> Void) -> Bool {
+        // Create a wrapped launch handler that tracks execution
+        let wrappedLaunchHandler: (BGTask) -> Void = { task in
+            let startTime = Date()
+            
+            // Record task execution start
+            let startEvent = BackgroundTaskEvent(
+                id: UUID(),
+                taskIdentifier: identifier,
+                type: .taskExecutionStarted,
+                timestamp: startTime,
+                duration: nil,
+                success: true,
+                errorMessage: nil,
+                metadata: ["task_type": String(describing: type(of: task))],
+                systemInfo: SystemInfo(
+                    backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
+                    deviceModel: UIDevice.current.model,
+                    systemVersion: UIDevice.current.systemVersion,
+                    lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                    batteryLevel: UIDevice.current.batteryLevel,
+                    batteryState: UIDevice.current.batteryState
+                )
             )
-        } else {
-            method_exchangeImplementations(originalMethod, swizzledMethod)
+            BackgroundTaskDataStore.shared.recordEvent(startEvent)
+            
+            // Swizzle the task's setTaskCompleted method
+            BGTaskSwizzler.swizzleTaskCompletion(for: task, startTime: startTime)
+            
+            // Call the original launch handler
+            launchHandler(task)
         }
         
-        logger.info("Successfully swizzled method: \(originalSelector)")
-        return originalMethod
+        return self.bt_register(forTaskWithIdentifier: identifier, using: queue, launchHandler: wrappedLaunchHandler)
     }
 }
 
-// MARK: - Extensions
+// MARK: - Date Extension
 
-private extension Date {
+extension Date {
     var iso8601String: String {
         let formatter = ISO8601DateFormatter()
         return formatter.string(from: self)
-    }
-}
-
-private extension SystemInfo {
-    static func current() -> SystemInfo {
-        UIDevice.current.isBatteryMonitoringEnabled = true
-        defer { UIDevice.current.isBatteryMonitoringEnabled = false }
-        
-        return SystemInfo(
-            backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
-            deviceModel: UIDevice.current.model,
-            systemVersion: UIDevice.current.systemVersion,
-            lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
-            batteryLevel: UIDevice.current.batteryLevel,
-            batteryState: UIDevice.current.batteryState
-        )
     }
 }
