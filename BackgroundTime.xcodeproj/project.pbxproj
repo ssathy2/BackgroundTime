@@ -72,6 +72,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				BackgroundTime.docc,
+				Package.swift,
 			);
 			target = DE48B69D2E7E6128009A676E /* BackgroundTime */;
 		};

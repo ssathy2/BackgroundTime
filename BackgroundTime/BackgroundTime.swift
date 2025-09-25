@@ -12,25 +12,33 @@ import os.log
 
 // MARK: - BackgroundTime SDK Main Class
 
-@MainActor
 public class BackgroundTime {
-    public static let shared = BackgroundTime()
+    public static let shared: BackgroundTime = {
+        let instance = BackgroundTime()
+        return instance
+    }()
     
     private let logger = Logger(subsystem: "BackgroundTime", category: "SDK")
-    private var isSwizzlingEnabled = false
+    private let initializationLock = NSLock()
+    private var isInitialized = false
     private let dataStore = BackgroundTaskDataStore.shared
     private let networkManager = NetworkManager.shared
     
-    private init() {}
+    private init() {
+        logger.info("BackgroundTime SDK instance created")
+    }
     
     /// Initialize BackgroundTime SDK with configuration
     public func initialize(configuration: BackgroundTimeConfiguration = .default) {
-        guard !isSwizzlingEnabled else {
+        initializationLock.lock()
+        defer { initializationLock.unlock() }
+        
+        guard !isInitialized else {
             logger.warning("BackgroundTime already initialized")
             return
         }
         
-        // Configure data store
+        // Configure data store with thread-safe circular buffer
         dataStore.configure(maxStoredEvents: configuration.maxStoredEvents)
         
         // Configure network manager
@@ -42,13 +50,15 @@ public class BackgroundTime {
         // Setup app lifecycle monitoring
         setupAppLifecycleMonitoring()
         
-        isSwizzlingEnabled = true
+        isInitialized = true
         logger.info("BackgroundTime SDK initialized successfully")
         
         // Record initialization event
         recordSDKEvent(.initialization, metadata: [
             "version": BackgroundTimeConfiguration.sdkVersion,
-            "configuration": configuration.description
+            "configuration": configuration.description,
+            "thread_safe_architecture": "enabled",
+            "circular_buffer_capacity": configuration.maxStoredEvents
         ])
     }
     
@@ -80,6 +90,16 @@ public class BackgroundTime {
     public func syncWithDashboard() async throws {
         let dashboardData = exportDataForDashboard()
         try await networkManager.uploadDashboardData(dashboardData)
+    }
+    
+    /// Get data store performance metrics
+    public func getDataStorePerformance() -> PerformanceReport {
+        return dataStore.getDataStorePerformance()
+    }
+    
+    /// Get buffer utilization statistics
+    public func getBufferStatistics() -> BufferStatistics {
+        return dataStore.getBufferStatistics()
     }
     
     // MARK: - Private Methods

@@ -14,58 +14,91 @@ class BackgroundTaskDataStore {
     static let shared = BackgroundTaskDataStore()
     
     private let logger = Logger(subsystem: "BackgroundTime", category: "DataStore")
-    private let dataQueue = DispatchQueue(label: "BackgroundTime.DataStore", attributes: .concurrent)
-    private var events: [BackgroundTaskEvent] = []
-    private var maxStoredEvents = 1000
+    private let eventStore: ThreadSafeDataStore<BackgroundTaskEvent>
+    private let performanceMonitor = AccessPatternMonitor.shared
     
     private let userDefaults = UserDefaults(suiteName: "BackgroundTime.DataStore")
     private let eventsKey = "BackgroundTime.StoredEvents"
     
     private init() {
+        // Initialize with default capacity
+        self.eventStore = ThreadSafeDataStore<BackgroundTaskEvent>(capacity: 1000)
         loadPersistedEvents()
     }
     
     func configure(maxStoredEvents: Int) {
-        dataQueue.async(flags: .barrier) {
-            self.maxStoredEvents = maxStoredEvents
-            self.trimEventsIfNeeded()
-        }
+        let startTime = CFAbsoluteTimeGetCurrent()
+        
+        eventStore.resize(to: maxStoredEvents)
+        
+        let duration = CFAbsoluteTimeGetCurrent() - startTime
+        performanceMonitor.recordAccess(operation: "configure", duration: duration)
+        
+        logger.info("Configured data store with max events: \(maxStoredEvents)")
     }
     
     func recordEvent(_ event: BackgroundTaskEvent) {
-        dataQueue.async(flags: .barrier) {
-            self.events.append(event)
-            self.trimEventsIfNeeded()
-            self.persistEvents()
-            
-            self.logger.info("Recorded event: \(event.type.rawValue) for task: \(event.taskIdentifier)")
+        let startTime = CFAbsoluteTimeGetCurrent()
+        
+        let droppedEvent = eventStore.append(event)
+        persistEvents()
+        
+        let duration = CFAbsoluteTimeGetCurrent() - startTime
+        performanceMonitor.recordAccess(operation: "recordEvent", duration: duration)
+        
+        if droppedEvent != nil {
+            logger.warning("Event dropped due to capacity limit: \(droppedEvent!.taskIdentifier)")
         }
+        
+        logger.info("Recorded event: \(event.type.rawValue) for task: \(event.taskIdentifier)")
     }
     
     func getAllEvents() -> [BackgroundTaskEvent] {
-        return dataQueue.sync {
-            return Array(self.events)
-        }
+        let startTime = CFAbsoluteTimeGetCurrent()
+        
+        let events = eventStore.toArray()
+        
+        let duration = CFAbsoluteTimeGetCurrent() - startTime
+        performanceMonitor.recordAccess(operation: "getAllEvents", duration: duration)
+        
+        return events
     }
     
     func getEvents(for taskIdentifier: String) -> [BackgroundTaskEvent] {
-        return dataQueue.sync {
-            return self.events.filter { $0.taskIdentifier == taskIdentifier }
-        }
+        let startTime = CFAbsoluteTimeGetCurrent()
+        
+        let events = eventStore.filter { $0.taskIdentifier == taskIdentifier }
+        
+        let duration = CFAbsoluteTimeGetCurrent() - startTime
+        performanceMonitor.recordAccess(operation: "getEventsForTask", duration: duration)
+        
+        return events
     }
     
     func getEventsInDateRange(from startDate: Date, to endDate: Date) -> [BackgroundTaskEvent] {
-        return dataQueue.sync {
-            return self.events.filter { event in
-                event.timestamp >= startDate && event.timestamp <= endDate
-            }
+        let startTime = CFAbsoluteTimeGetCurrent()
+        
+        let events = eventStore.filter { event in
+            event.timestamp >= startDate && event.timestamp <= endDate
         }
+        
+        let duration = CFAbsoluteTimeGetCurrent() - startTime
+        performanceMonitor.recordAccess(operation: "getEventsInDateRange", duration: duration)
+        
+        return events
     }
     
     func generateStatistics() -> BackgroundTaskStatistics {
-        return dataQueue.sync {
-            return generateStatisticsInternal(from: self.events)
+        let startTime = CFAbsoluteTimeGetCurrent()
+        
+        let statistics = eventStore.performBatchRead { events in
+            return generateStatisticsInternal(from: events)
         }
+        
+        let duration = CFAbsoluteTimeGetCurrent() - startTime
+        performanceMonitor.recordAccess(operation: "generateStatistics", duration: duration)
+        
+        return statistics
     }
     
     func generateStatistics(for events: [BackgroundTaskEvent], in dateRange: ClosedRange<Date>) -> BackgroundTaskStatistics {
@@ -116,25 +149,22 @@ class BackgroundTaskDataStore {
     }
     
     func clearAllEvents() {
-        dataQueue.async(flags: .barrier) {
-            self.events.removeAll()
-            self.persistEvents()
-            self.logger.info("Cleared all stored events")
-        }
+        let startTime = CFAbsoluteTimeGetCurrent()
+        
+        eventStore.clear()
+        persistEvents()
+        
+        let duration = CFAbsoluteTimeGetCurrent() - startTime
+        performanceMonitor.recordAccess(operation: "clearAllEvents", duration: duration)
+        
+        logger.info("Cleared all stored events")
     }
     
     // MARK: - Private Methods
     
-    private func trimEventsIfNeeded() {
-        if events.count > maxStoredEvents {
-            let eventsToRemove = events.count - maxStoredEvents
-            events.removeFirst(eventsToRemove)
-            logger.info("Trimmed \(eventsToRemove) old events")
-        }
-    }
-    
     private func persistEvents() {
         do {
+            let events = eventStore.toArray()
             let data = try JSONEncoder().encode(events)
             userDefaults?.set(data, forKey: eventsKey)
         } catch {
@@ -146,12 +176,22 @@ class BackgroundTaskDataStore {
         guard let data = userDefaults?.data(forKey: eventsKey) else { return }
         
         do {
-            events = try JSONDecoder().decode([BackgroundTaskEvent].self, from: data)
-            logger.info("Loaded \(self.events.count) persisted events")
+            let events = try JSONDecoder().decode([BackgroundTaskEvent].self, from: data)
+            eventStore.append(contentsOf: events)
+            logger.info("Loaded \(events.count) persisted events")
         } catch {
             logger.error("Failed to load persisted events: \(error.localizedDescription)")
-            events = []
         }
+    }
+    
+    // MARK: - Performance Monitoring
+    
+    func getDataStorePerformance() -> PerformanceReport {
+        return performanceMonitor.getPerformanceReport()
+    }
+    
+    func getBufferStatistics() -> BufferStatistics {
+        return eventStore.getStatistics()
     }
 }
 
@@ -196,7 +236,8 @@ extension BackgroundTaskDataStore {
     
     func getDailyExecutionPattern() -> [DailyExecutionData] {
         let calendar = Calendar.current
-        let grouped = Dictionary(grouping: events.filter { $0.type == .taskExecutionStarted }) { event in
+        let allEvents = getAllEvents() // Get events from the data store
+        let grouped = Dictionary(grouping: allEvents.filter { $0.type == .taskExecutionStarted }) { event in
             calendar.startOfDay(for: event.timestamp)
         }
         
