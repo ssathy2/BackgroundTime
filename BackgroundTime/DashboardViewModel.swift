@@ -20,6 +20,12 @@ class DashboardViewModel: ObservableObject {
     
     private let dataStore = BackgroundTaskDataStore.shared
     private var cancellables = Set<AnyCancellable>()
+    private var currentTimeRange: TimeRange = .last24Hours
+    
+    /// The currently selected time range for filtering data
+    var selectedTimeRange: TimeRange {
+        currentTimeRange
+    }
     
     init() {
         // Auto-refresh every 30 seconds
@@ -32,6 +38,12 @@ class DashboardViewModel: ObservableObject {
     }
     
     func loadData(for timeRange: TimeRange) {
+        // Don't reload if we're already showing this time range and not loading
+        if currentTimeRange == timeRange && !isLoading {
+            return
+        }
+        
+        currentTimeRange = timeRange
         isLoading = true
         error = nil
         
@@ -43,8 +55,8 @@ class DashboardViewModel: ObservableObject {
                 // Load filtered events
                 let filteredEvents = dataStore.getEventsInDateRange(from: startDate, to: endDate)
                 
-                // Generate statistics
-                let stats = dataStore.generateStatistics()
+                // Generate statistics based on filtered events
+                let stats = dataStore.generateStatistics(for: filteredEvents, in: startDate...endDate)
                 
                 // Generate timeline data
                 let timeline = filteredEvents.map { event in
@@ -57,10 +69,10 @@ class DashboardViewModel: ObservableObject {
                     )
                 }.sorted(by: { $0.timestamp > $1.timestamp })
                 
-                // Generate task metrics
+                // Generate task metrics for filtered events
                 let uniqueTaskIdentifiers = Set(filteredEvents.map { $0.taskIdentifier })
                 let metrics = uniqueTaskIdentifiers.compactMap { identifier in
-                    dataStore.getTaskPerformanceMetrics(for: identifier)
+                    dataStore.getTaskPerformanceMetrics(for: identifier, in: startDate...endDate)
                 }.sorted(by: { $0.taskIdentifier < $1.taskIdentifier })
                 
                 await MainActor.run {
@@ -87,12 +99,12 @@ class DashboardViewModel: ObservableObject {
     }
     
     func refresh() {
-        loadData(for: .last24Hours) // Default refresh to last 24 hours
+        loadData(for: currentTimeRange)
     }
     
     func clearAllData() {
         dataStore.clearAllEvents()
-        loadData(for: .last24Hours)
+        loadData(for: currentTimeRange)
     }
     
     func exportData() -> BackgroundTaskDashboardData {

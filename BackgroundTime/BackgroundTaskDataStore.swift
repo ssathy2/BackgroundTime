@@ -64,47 +64,55 @@ class BackgroundTaskDataStore {
     
     func generateStatistics() -> BackgroundTaskStatistics {
         return dataQueue.sync {
-            let totalScheduled = self.events.filter { $0.type == .taskScheduled }.count
-            let totalExecuted = self.events.filter { $0.type == .taskExecutionStarted }.count
-            let totalCompleted = self.events.filter { $0.type == .taskExecutionCompleted && $0.success }.count
-            let totalFailed = self.events.filter { $0.type == .taskFailed || ($0.type == .taskExecutionCompleted && !$0.success) }.count
-            let totalExpired = self.events.filter { $0.type == .taskExpired }.count
-            
-            let completedEvents = self.events.filter { 
-                $0.type == .taskExecutionCompleted && $0.duration != nil 
-            }
-            
-            let averageExecutionTime = completedEvents.isEmpty ? 0 : 
-                completedEvents.compactMap { $0.duration }.reduce(0, +) / Double(completedEvents.count)
-            
-            let successRate = totalExecuted > 0 ? Double(totalCompleted) / Double(totalExecuted) : 0
-            
-            let executionsByHour = Dictionary(grouping: self.events.filter { $0.type == .taskExecutionStarted }) { event in
-                Calendar.current.component(.hour, from: event.timestamp)
-            }.mapValues { $0.count }
-            
-            let errorsByType = Dictionary(grouping: self.events.filter { !$0.success && $0.errorMessage != nil }) { event in
-                event.errorMessage ?? "Unknown Error"
-            }.mapValues { $0.count }
-            
-            let lastExecutionTime = self.events
-                .filter { $0.type == .taskExecutionStarted }
-                .max(by: { $0.timestamp < $1.timestamp })?.timestamp
-            
-            return BackgroundTaskStatistics(
-                totalTasksScheduled: totalScheduled,
-                totalTasksExecuted: totalExecuted,
-                totalTasksCompleted: totalCompleted,
-                totalTasksFailed: totalFailed,
-                totalTasksExpired: totalExpired,
-                averageExecutionTime: averageExecutionTime,
-                successRate: successRate,
-                executionsByHour: executionsByHour,
-                errorsByType: errorsByType,
-                lastExecutionTime: lastExecutionTime,
-                generatedAt: Date()
-            )
+            return generateStatisticsInternal(from: self.events)
         }
+    }
+    
+    func generateStatistics(for events: [BackgroundTaskEvent], in dateRange: ClosedRange<Date>) -> BackgroundTaskStatistics {
+        return generateStatisticsInternal(from: events)
+    }
+    
+    private func generateStatisticsInternal(from events: [BackgroundTaskEvent]) -> BackgroundTaskStatistics {
+        let totalScheduled = events.filter { $0.type == .taskScheduled }.count
+        let totalExecuted = events.filter { $0.type == .taskExecutionStarted }.count
+        let totalCompleted = events.filter { $0.type == .taskExecutionCompleted && $0.success }.count
+        let totalFailed = events.filter { $0.type == .taskFailed || ($0.type == .taskExecutionCompleted && !$0.success) }.count
+        let totalExpired = events.filter { $0.type == .taskExpired }.count
+        
+        let completedEvents = events.filter { 
+            $0.type == .taskExecutionCompleted && $0.duration != nil 
+        }
+        
+        let averageExecutionTime = completedEvents.isEmpty ? 0 : 
+            completedEvents.compactMap { $0.duration }.reduce(0, +) / Double(completedEvents.count)
+        
+        let successRate = totalExecuted > 0 ? Double(totalCompleted) / Double(totalExecuted) : 0
+        
+        let executionsByHour = Dictionary(grouping: events.filter { $0.type == .taskExecutionStarted }) { event in
+            Calendar.current.component(.hour, from: event.timestamp)
+        }.mapValues { $0.count }
+        
+        let errorsByType = Dictionary(grouping: events.filter { !$0.success && $0.errorMessage != nil }) { event in
+            event.errorMessage ?? "Unknown Error"
+        }.mapValues { $0.count }
+        
+        let lastExecutionTime = events
+            .filter { $0.type == .taskExecutionStarted }
+            .max(by: { $0.timestamp < $1.timestamp })?.timestamp
+        
+        return BackgroundTaskStatistics(
+            totalTasksScheduled: totalScheduled,
+            totalTasksExecuted: totalExecuted,
+            totalTasksCompleted: totalCompleted,
+            totalTasksFailed: totalFailed,
+            totalTasksExpired: totalExpired,
+            averageExecutionTime: averageExecutionTime,
+            successRate: successRate,
+            executionsByHour: executionsByHour,
+            errorsByType: errorsByType,
+            lastExecutionTime: lastExecutionTime,
+            generatedAt: Date()
+        )
     }
     
     func clearAllEvents() {
@@ -152,7 +160,15 @@ class BackgroundTaskDataStore {
 extension BackgroundTaskDataStore {
     func getTaskPerformanceMetrics(for taskIdentifier: String) -> TaskPerformanceMetrics? {
         let taskEvents = getEvents(for: taskIdentifier)
-        
+        return generateTaskMetrics(for: taskIdentifier, from: taskEvents)
+    }
+    
+    func getTaskPerformanceMetrics(for taskIdentifier: String, in dateRange: ClosedRange<Date>) -> TaskPerformanceMetrics? {
+        let taskEvents = getEvents(for: taskIdentifier).filter { dateRange.contains($0.timestamp) }
+        return generateTaskMetrics(for: taskIdentifier, from: taskEvents)
+    }
+    
+    private func generateTaskMetrics(for taskIdentifier: String, from taskEvents: [BackgroundTaskEvent]) -> TaskPerformanceMetrics? {
         guard !taskEvents.isEmpty else { return nil }
         
         let scheduledEvents = taskEvents.filter { $0.type == .taskScheduled }

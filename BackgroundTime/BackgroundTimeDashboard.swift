@@ -9,6 +9,78 @@ import SwiftUI
 import Charts
 import BackgroundTasks
 
+// MARK: - Enums and Types
+
+enum DashboardTab: CaseIterable {
+    case overview, timeline, performance, errors, continuousTasks
+    
+    var title: String {
+        switch self {
+        case .overview: return "Overview"
+        case .timeline: return "Timeline"
+        case .performance: return "Performance"
+        case .errors: return "Errors"
+        case .continuousTasks: return "Continuous"
+        }
+    }
+    
+    var systemImage: String {
+        switch self {
+        case .overview: return "chart.bar.fill"
+        case .timeline: return "clock.fill"
+        case .performance: return "speedometer"
+        case .errors: return "exclamationmark.triangle.fill"
+        case .continuousTasks: return "infinity.circle.fill"
+        }
+    }
+    
+    @available(iOS 26.0, *)
+    static var allCasesForCurrentOS: [DashboardTab] {
+        return DashboardTab.allCases
+    }
+    
+    static var allCasesForLegacyOS: [DashboardTab] {
+        return [.overview, .timeline, .performance, .errors]
+    }
+}
+
+enum TimeRange: String, CaseIterable {
+    case last1Hour = "1h"
+    case last6Hours = "6h"
+    case last24Hours = "24h"
+    case last7Days = "7d"
+    
+    var displayName: String {
+        switch self {
+        case .last1Hour: return "1 Hour"
+        case .last6Hours: return "6 Hours"
+        case .last24Hours: return "24 Hours"
+        case .last7Days: return "7 Days"
+        }
+    }
+    
+    var timeInterval: TimeInterval {
+        switch self {
+        case .last1Hour: return 3600
+        case .last6Hours: return 21600
+        case .last24Hours: return 86400
+        case .last7Days: return 604800
+        }
+    }
+}
+
+// MARK: - iOS Version Support Helpers
+
+extension UIDevice {
+    /// Returns true if the current device supports Continuous Background Tasks (iOS 26.0+)
+    static var supportsContinuousBackgroundTasks: Bool {
+        if #available(iOS 26.0, *) {
+            return true
+        }
+        return false
+    }
+}
+
 // MARK: - Main Dashboard View
 
 @available(iOS 16.0, *)
@@ -16,6 +88,7 @@ public struct BackgroundTimeDashboard: View {
     @StateObject private var viewModel = DashboardViewModel()
     @State private var selectedTimeRange: TimeRange = .last24Hours
     @State private var selectedTab: DashboardTab = .overview
+    @State private var showingError = false
     
     public init() {}
     
@@ -65,17 +138,38 @@ public struct BackgroundTimeDashboard: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { viewModel.refresh() }) {
+                    Button(action: { 
+                        Task { @MainActor in
+                            viewModel.refresh()
+                        }
+                    }) {
                         Image(systemName: "arrow.clockwise")
                     }
+                    .disabled(viewModel.isLoading)
                 }
+            }
+            .alert("Error", isPresented: $showingError) {
+                Button("OK") {
+                    viewModel.error = nil
+                }
+            } message: {
+                Text(viewModel.error ?? "")
             }
         }
         .onAppear {
-            viewModel.loadData(for: selectedTimeRange)
+            Task { @MainActor in
+                if viewModel.events.isEmpty && !viewModel.isLoading {
+                    viewModel.loadData(for: selectedTimeRange)
+                }
+            }
         }
         .onChange(of: selectedTimeRange) { _, newRange in
-            viewModel.loadData(for: newRange)
+            Task { @MainActor in
+                viewModel.loadData(for: newRange)
+            }
+        }
+        .onChange(of: viewModel.error) { _, newError in
+            showingError = newError != nil
         }
     }
     
@@ -88,6 +182,16 @@ public struct BackgroundTimeDashboard: View {
         .pickerStyle(SegmentedPickerStyle())
         .padding()
     }
+    
+    /// Available dashboard tabs based on current iOS version
+    private var availableTabs: [DashboardTab] {
+        if UIDevice.supportsContinuousBackgroundTasks {
+            if #available(iOS 26.0, *) {
+                return DashboardTab.allCasesForCurrentOS
+            }
+        }
+        return DashboardTab.allCasesForLegacyOS
+    }
 }
 
 // MARK: - Overview Tab
@@ -99,46 +203,72 @@ struct OverviewTabView: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
-                // Statistics Cards
-                HStack(spacing: 16) {
-                    StatisticCard(
-                        title: "Total Executed",
-                        value: "\(viewModel.statistics?.totalTasksExecuted ?? 0)",
-                        icon: "play.fill",
-                        color: .blue
-                    )
-                    
-                    StatisticCard(
-                        title: "Success Rate",
-                        value: String(format: "%.1f%%", (viewModel.statistics?.successRate ?? 0) * 100),
-                        icon: "checkmark.circle.fill",
-                        color: .green
-                    )
+                // Loading indicator
+                if viewModel.isLoading {
+                    ProgressView("Loading...")
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding()
                 }
                 
-                HStack(spacing: 16) {
-                    StatisticCard(
-                        title: "Failed Tasks",
-                        value: "\(viewModel.statistics?.totalTasksFailed ?? 0)",
-                        icon: "xmark.circle.fill",
-                        color: .red
-                    )
-                    
-                    StatisticCard(
-                        title: "Avg Duration",
-                        value: "\(viewModel.statistics?.averageExecutionTime ?? 0)",
-                        icon: "timer",
-                        color: .orange
-                    )
+                // No data message
+                if !viewModel.isLoading && viewModel.events.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "clock.badge.exclamationmark")
+                            .font(.largeTitle)
+                            .foregroundColor(.secondary)
+                        Text("No events found for selected time range")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                        Text("Try selecting a different time range or wait for background tasks to execute.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding()
+                }
+                
+                // Statistics Cards
+                if !viewModel.isLoading && !viewModel.events.isEmpty {
+                    HStack(spacing: 16) {
+                        StatisticCard(
+                            title: "Total Executed",
+                            value: "\(viewModel.statistics?.totalTasksExecuted ?? 0)",
+                            icon: "play.fill",
+                            color: .blue
+                        )
+                        
+                        StatisticCard(
+                            title: "Success Rate",
+                            value: String(format: "%.1f%%", (viewModel.statistics?.successRate ?? 0) * 100),
+                            icon: "checkmark.circle.fill",
+                            color: .green
+                        )
+                    }
+                
+                    HStack(spacing: 16) {
+                        StatisticCard(
+                            title: "Failed Tasks",
+                            value: "\(viewModel.statistics?.totalTasksFailed ?? 0)",
+                            icon: "xmark.circle.fill",
+                            color: .red
+                        )
+                        
+                        StatisticCard(
+                            title: "Avg Duration",
+                            value: String(format: "%.1fs", viewModel.statistics?.averageExecutionTime ?? 0),
+                            icon: "timer",
+                            color: .orange
+                        )
+                    }
                 }
                 
                 // Continuous Tasks Section (iOS 26.0+)
-                if #available(iOS 26.0, *), UIDevice.supportsContinuousBackgroundTasks {
+                if #available(iOS 26.0, *), UIDevice.supportsContinuousBackgroundTasks, !viewModel.isLoading {
                     continuousTasksOverviewSection
                 }
                 
                 // Execution Pattern Chart
-                if let hourlyData = viewModel.statistics?.executionsByHour {
+                if let hourlyData = viewModel.statistics?.executionsByHour, !viewModel.isLoading, !hourlyData.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Executions by Hour")
                             .font(.headline)
@@ -161,12 +291,16 @@ struct OverviewTabView: View {
                 }
                 
                 // Recent Events
-                RecentEventsView(events: Array(viewModel.events.prefix(10)))
+                if !viewModel.isLoading {
+                    RecentEventsView(events: Array(viewModel.events.prefix(10)))
+                }
             }
             .padding()
         }
         .refreshable {
-            viewModel.refresh()
+            Task { @MainActor in
+                viewModel.refresh()
+            }
         }
     }
     
@@ -232,7 +366,9 @@ struct TimelineTabView: View {
             .padding()
         }
         .refreshable {
-            viewModel.refresh()
+            Task { @MainActor in
+                viewModel.refresh()
+            }
         }
     }
 }
@@ -284,7 +420,9 @@ struct PerformanceTabView: View {
             .padding()
         }
         .refreshable {
-            viewModel.refresh()
+            Task { @MainActor in
+                viewModel.refresh()
+            }
         }
     }
 }
@@ -310,7 +448,9 @@ struct ErrorsTabView: View {
             .padding()
         }
         .refreshable {
-            viewModel.refresh()
+            Task { @MainActor in
+                viewModel.refresh()
+            }
         }
     }
     
@@ -373,7 +513,9 @@ struct ContinuousTasksTabView: View {
             .padding()
         }
         .refreshable {
-            viewModel.refresh()
+            Task { @MainActor in
+                viewModel.refresh()
+            }
         }
     }
     
@@ -937,89 +1079,5 @@ extension BackgroundTaskEventType {
                 return "chart.bar.fill"
             }
         }
-    }
-}
-
-// MARK: - Enums
-
-enum DashboardTab: CaseIterable {
-    case overview, timeline, performance, errors, continuousTasks
-    
-    var title: String {
-        switch self {
-        case .overview: return "Overview"
-        case .timeline: return "Timeline"
-        case .performance: return "Performance"
-        case .errors: return "Errors"
-        case .continuousTasks: return "Continuous"
-        }
-    }
-    
-    var systemImage: String {
-        switch self {
-        case .overview: return "chart.bar.fill"
-        case .timeline: return "clock.fill"
-        case .performance: return "speedometer"
-        case .errors: return "exclamationmark.triangle.fill"
-        case .continuousTasks: return "infinity.circle.fill"
-        }
-    }
-    
-    @available(iOS 26.0, *)
-    static var allCasesForCurrentOS: [DashboardTab] {
-        return DashboardTab.allCases
-    }
-    
-    static var allCasesForLegacyOS: [DashboardTab] {
-        return [.overview, .timeline, .performance, .errors]
-    }
-}
-
-enum TimeRange: String, CaseIterable {
-    case last1Hour = "1h"
-    case last6Hours = "6h"
-    case last24Hours = "24h"
-    case last7Days = "7d"
-    
-    var displayName: String {
-        switch self {
-        case .last1Hour: return "1 Hour"
-        case .last6Hours: return "6 Hours"
-        case .last24Hours: return "24 Hours"
-        case .last7Days: return "7 Days"
-        }
-    }
-    
-    var timeInterval: TimeInterval {
-        switch self {
-        case .last1Hour: return 3600
-        case .last6Hours: return 21600
-        case .last24Hours: return 86400
-        case .last7Days: return 604800
-        }
-    }
-}
-
-// MARK: - iOS Version Support Helpers
-
-extension UIDevice {
-    /// Returns true if the current device supports Continuous Background Tasks (iOS 26.0+)
-    static var supportsContinuousBackgroundTasks: Bool {
-        if #available(iOS 26.0, *) {
-            return true
-        }
-        return false
-    }
-}
-
-extension BackgroundTimeDashboard {
-    /// Available dashboard tabs based on current iOS version
-    private var availableTabs: [DashboardTab] {
-        if UIDevice.supportsContinuousBackgroundTasks {
-            if #available(iOS 26.0, *) {
-                return DashboardTab.allCasesForCurrentOS
-            }
-        }
-        return DashboardTab.allCasesForLegacyOS
     }
 }
