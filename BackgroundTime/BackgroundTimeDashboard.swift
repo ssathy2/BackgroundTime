@@ -100,25 +100,25 @@ public struct BackgroundTimeDashboard: View {
                 
                 // Tab View
                 TabView(selection: $selectedTab) {
-                    OverviewTabView(viewModel: viewModel)
+                    OverviewTabView(viewModel: viewModel, selectedTimeRange: selectedTimeRange)
                         .tabItem {
                             Label("Overview", systemImage: "chart.bar.fill")
                         }
                         .tag(DashboardTab.overview)
                     
-                    TimelineTabView(viewModel: viewModel)
+                    TimelineTabView(viewModel: viewModel, selectedTimeRange: selectedTimeRange)
                         .tabItem {
                             Label("Timeline", systemImage: "clock.fill")
                         }
                         .tag(DashboardTab.timeline)
                     
-                    PerformanceTabView(viewModel: viewModel)
+                    PerformanceTabView(viewModel: viewModel, selectedTimeRange: selectedTimeRange)
                         .tabItem {
                             Label("Performance", systemImage: "speedometer")
                         }
                         .tag(DashboardTab.performance)
                     
-                    ErrorsTabView(viewModel: viewModel)
+                    ErrorsTabView(viewModel: viewModel, selectedTimeRange: selectedTimeRange)
                         .tabItem {
                             Label("Errors", systemImage: "exclamationmark.triangle.fill")
                         }
@@ -126,7 +126,7 @@ public struct BackgroundTimeDashboard: View {
                     
                     // Continuous Tasks Tab (iOS 26.0+)
                     if #available(iOS 26.0, *) {
-                        ContinuousTasksTabView(viewModel: viewModel)
+                        ContinuousTasksTabView(viewModel: viewModel, selectedTimeRange: selectedTimeRange)
                             .tabItem {
                                 Label("Continuous", systemImage: "infinity.circle.fill")
                             }
@@ -174,12 +174,30 @@ public struct BackgroundTimeDashboard: View {
     }
     
     private var timeRangePicker: some View {
-        Picker("Time Range", selection: $selectedTimeRange) {
-            ForEach(TimeRange.allCases, id: \.self) { range in
-                Text(range.displayName).tag(range)
+        VStack(spacing: 8) {
+            Picker("Time Range", selection: $selectedTimeRange) {
+                ForEach(TimeRange.allCases, id: \.self) { range in
+                    Text(range.displayName).tag(range)
+                }
             }
+            .pickerStyle(SegmentedPickerStyle())
+            
+            // Time range indicator
+            HStack {
+                Image(systemName: "clock")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                Text("Showing data from \(selectedTimeRange.displayName.lowercased()) ago")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                Spacer()
+                if viewModel.isLoading {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                }
+            }
+            .padding(.horizontal)
         }
-        .pickerStyle(SegmentedPickerStyle())
         .padding()
     }
     
@@ -199,6 +217,24 @@ public struct BackgroundTimeDashboard: View {
 @available(iOS 16.0, *)
 struct OverviewTabView: View {
     @ObservedObject var viewModel: DashboardViewModel
+    let selectedTimeRange: TimeRange
+    
+    private var filteredEvents: [BackgroundTaskEvent] {
+        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.timeInterval)
+        return viewModel.events.filter { $0.timestamp >= cutoffDate }
+    }
+    
+    private var filteredStatistics: BackgroundTaskStatistics? {
+        guard let stats = viewModel.statistics else { return nil }
+        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.timeInterval)
+        let events = viewModel.events.filter { $0.timestamp >= cutoffDate }
+        
+        // Recalculate statistics for filtered events
+        return BackgroundTaskDataStore.shared.generateStatistics(
+            for: events, 
+            in: cutoffDate...Date()
+        )
+    }
     
     var body: some View {
         ScrollView {
@@ -211,7 +247,7 @@ struct OverviewTabView: View {
                 }
                 
                 // No data message
-                if !viewModel.isLoading && viewModel.events.isEmpty {
+                if !viewModel.isLoading && filteredEvents.isEmpty {
                     VStack(spacing: 8) {
                         Image(systemName: "clock.badge.exclamationmark")
                             .font(.largeTitle)
@@ -228,18 +264,18 @@ struct OverviewTabView: View {
                 }
                 
                 // Statistics Cards
-                if !viewModel.isLoading && !viewModel.events.isEmpty {
+                if !viewModel.isLoading && !filteredEvents.isEmpty {
                     HStack(spacing: 16) {
                         StatisticCard(
                             title: "Total Executed",
-                            value: "\(viewModel.statistics?.totalTasksExecuted ?? 0)",
+                            value: "\(filteredStatistics?.totalTasksExecuted ?? 0)",
                             icon: "play.fill",
                             color: .blue
                         )
                         
                         StatisticCard(
                             title: "Success Rate",
-                            value: String(format: "%.1f%%", (viewModel.statistics?.successRate ?? 0) * 100),
+                            value: String(format: "%.1f%%", (filteredStatistics?.successRate ?? 0) * 100),
                             icon: "checkmark.circle.fill",
                             color: .green
                         )
@@ -248,14 +284,14 @@ struct OverviewTabView: View {
                     HStack(spacing: 16) {
                         StatisticCard(
                             title: "Failed Tasks",
-                            value: "\(viewModel.statistics?.totalTasksFailed ?? 0)",
+                            value: "\(filteredStatistics?.totalTasksFailed ?? 0)",
                             icon: "xmark.circle.fill",
                             color: .red
                         )
                         
                         StatisticCard(
                             title: "Avg Duration",
-                            value: String(format: "%.1fs", viewModel.statistics?.averageExecutionTime ?? 0),
+                            value: String(format: "%.1fs", filteredStatistics?.averageExecutionTime ?? 0),
                             icon: "timer",
                             color: .orange
                         )
@@ -268,7 +304,7 @@ struct OverviewTabView: View {
                 }
                 
                 // Execution Pattern Chart
-                if let hourlyData = viewModel.statistics?.executionsByHour, !viewModel.isLoading, !hourlyData.isEmpty {
+                if let hourlyData = filteredStatistics?.executionsByHour, !viewModel.isLoading, !hourlyData.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Executions by Hour")
                             .font(.headline)
@@ -292,7 +328,7 @@ struct OverviewTabView: View {
                 
                 // Recent Events
                 if !viewModel.isLoading {
-                    RecentEventsView(events: Array(viewModel.events.prefix(10)))
+                    RecentEventsView(events: Array(filteredEvents.prefix(10)))
                 }
             }
             .padding()
@@ -309,7 +345,7 @@ struct OverviewTabView: View {
     @available(iOS 26.0, *)
     @ViewBuilder
     private var continuousTasksOverviewSection: some View {
-        let continuousEvents = viewModel.events.filter { $0.type.isContinuousTaskEvent }
+        let continuousEvents = filteredEvents.filter { $0.type.isContinuousTaskEvent }
         
         if !continuousEvents.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
@@ -352,14 +388,20 @@ struct OverviewTabView: View {
 @available(iOS 16.0, *)
 struct TimelineTabView: View {
     @ObservedObject var viewModel: DashboardViewModel
+    let selectedTimeRange: TimeRange
+    
+    private var filteredTimelineData: [TimelineDataPoint] {
+        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.timeInterval)
+        return viewModel.timelineData.filter { $0.timestamp >= cutoffDate }
+    }
     
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 8) {
-                ForEach(Array(viewModel.timelineData.enumerated()), id: \.element.id) { index, dataPoint in
+                ForEach(Array(filteredTimelineData.enumerated()), id: \.element.id) { index, dataPoint in
                     TimelineRowView(
                         dataPoint: dataPoint,
-                        isLast: index == viewModel.timelineData.count - 1
+                        isLast: index == filteredTimelineData.count - 1
                     )
                 }
             }
@@ -378,9 +420,24 @@ struct TimelineTabView: View {
 @available(iOS 16.0, *)
 struct PerformanceTabView: View {
     @ObservedObject var viewModel: DashboardViewModel
+    let selectedTimeRange: TimeRange
     @State private var selectedMetricFilter: PerformanceMetricFilter = .all
     @State private var showingDetailedMetrics = false
     @State private var selectedTaskForDetail: String?
+    
+    private var filteredEvents: [BackgroundTaskEvent] {
+        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.timeInterval)
+        return viewModel.events.filter { $0.timestamp >= cutoffDate }
+    }
+    
+    private var filteredStatistics: BackgroundTaskStatistics? {
+        guard !filteredEvents.isEmpty else { return nil }
+        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.timeInterval)
+        return BackgroundTaskDataStore.shared.generateStatistics(
+            for: filteredEvents,
+            in: cutoffDate...Date()
+        )
+    }
     
     var body: some View {
         ScrollView {
@@ -453,14 +510,14 @@ struct PerformanceTabView: View {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
                 PerformanceKPICard(
                     title: "Avg Execution Time",
-                    value: String(format: "%.2fs", viewModel.statistics?.averageExecutionTime ?? 0),
+                    value: String(format: "%.2fs", filteredStatistics?.averageExecutionTime ?? 0),
                     trend: calculateExecutionTimeTrend(),
                     icon: "timer"
                 )
                 
                 PerformanceKPICard(
                     title: "Success Rate",
-                    value: String(format: "%.1f%%", (viewModel.statistics?.successRate ?? 0) * 100),
+                    value: String(format: "%.1f%%", (filteredStatistics?.successRate ?? 0) * 100),
                     trend: calculateSuccessRateTrend(),
                     icon: "checkmark.circle.fill"
                 )
@@ -524,7 +581,7 @@ struct PerformanceTabView: View {
     @available(iOS 17.0, *)
     @ViewBuilder
     private var performance3DVisualization: some View {
-        if !viewModel.events.isEmpty {
+        if !filteredEvents.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Text("Performance Heat Surface")
@@ -613,7 +670,7 @@ struct PerformanceTabView: View {
     // MARK: - Enhanced Duration Chart
     @ViewBuilder
     private var enhancedDurationChart: some View {
-        if !viewModel.events.isEmpty {
+        if !filteredEvents.isEmpty {
             let filteredDurationEvents = getFilteredDurationEvents()
             
             if !filteredDurationEvents.isEmpty {
@@ -846,7 +903,7 @@ struct PerformanceTabView: View {
     // MARK: - Helper Methods
     
     private func getFilteredDurationEvents() -> [DurationEvent] {
-        let events = viewModel.events.compactMap { event -> DurationEvent? in
+        let events = filteredEvents.compactMap { event -> DurationEvent? in
             guard let duration = event.duration, event.type == .taskExecutionCompleted else { return nil }
             
             switch selectedMetricFilter {
@@ -889,7 +946,7 @@ struct PerformanceTabView: View {
         var data: [Int: Double] = [:]
         
         for hour in 0..<24 {
-            let events = viewModel.events.filter { 
+            let events = filteredEvents.filter { 
                 Calendar.current.component(.hour, from: $0.timestamp) == hour &&
                 $0.type == .taskExecutionCompleted
             }
@@ -953,7 +1010,7 @@ struct PerformanceTabView: View {
     }
     
     private func calculateTaskThroughput() -> Double {
-        let recentEvents = viewModel.events.filter { 
+        let recentEvents = filteredEvents.filter { 
             $0.timestamp > Date().addingTimeInterval(-3600)
         }
         return Double(recentEvents.count) / 60.0
@@ -1007,12 +1064,27 @@ struct PerformanceTabView: View {
 @available(iOS 16.0, *)
 struct ErrorsTabView: View {
     @ObservedObject var viewModel: DashboardViewModel
+    let selectedTimeRange: TimeRange
+    
+    private var filteredEvents: [BackgroundTaskEvent] {
+        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.timeInterval)
+        return viewModel.events.filter { $0.timestamp >= cutoffDate }
+    }
+    
+    private var filteredStatistics: BackgroundTaskStatistics? {
+        guard !filteredEvents.isEmpty else { return nil }
+        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.timeInterval)
+        return BackgroundTaskDataStore.shared.generateStatistics(
+            for: filteredEvents,
+            in: cutoffDate...Date()
+        )
+    }
     
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 // Error Summary
-                if let errorsByType = viewModel.statistics?.errorsByType,
+                if let errorsByType = filteredStatistics?.errorsByType,
                    !errorsByType.isEmpty {
                     ErrorSummarySection(errorsByType: errorsByType)
                 }
@@ -1057,7 +1129,7 @@ struct ErrorsTabView: View {
     
     @ViewBuilder
     private var failedEventsSection: some View {
-        let failedEvents = viewModel.events.filter { !$0.success }
+        let failedEvents = filteredEvents.filter { !$0.success }
         ForEach(failedEvents) { event in
             ErrorEventCard(event: event)
         }
@@ -1069,6 +1141,12 @@ struct ErrorsTabView: View {
 @available(iOS 26.0, *)
 struct ContinuousTasksTabView: View {
     @ObservedObject var viewModel: DashboardViewModel
+    let selectedTimeRange: TimeRange
+    
+    private var filteredEvents: [BackgroundTaskEvent] {
+        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.timeInterval)
+        return viewModel.events.filter { $0.timestamp >= cutoffDate }
+    }
     
     var body: some View {
         ScrollView {
@@ -1096,7 +1174,7 @@ struct ContinuousTasksTabView: View {
     
     @ViewBuilder
     private var continuousTasksSummary: some View {
-        let continuousEvents = viewModel.events.filter { $0.type.isContinuousTaskEvent }
+        let continuousEvents = filteredEvents.filter { $0.type.isContinuousTaskEvent }
         let activeTasks = Set(continuousEvents
             .filter { $0.type == .continuousTaskStarted }
             .map { $0.taskIdentifier })
@@ -1154,7 +1232,7 @@ struct ContinuousTasksTabView: View {
                 .font(.headline)
                 .padding(.horizontal)
             
-            let continuousEvents = viewModel.events.filter { $0.type.isContinuousTaskEvent }
+            let continuousEvents = filteredEvents.filter { $0.type.isContinuousTaskEvent }
             let tasksByIdentifier = Dictionary(grouping: continuousEvents) { $0.taskIdentifier }
             
             if tasksByIdentifier.isEmpty {
@@ -1177,7 +1255,7 @@ struct ContinuousTasksTabView: View {
     
     @ViewBuilder
     private var continuousTasksTimeline: some View {
-        let continuousEvents = viewModel.events
+        let continuousEvents = filteredEvents
             .filter { $0.type.isContinuousTaskEvent }
             .sorted { $0.timestamp > $1.timestamp }
         
@@ -1206,7 +1284,7 @@ struct ContinuousTasksTabView: View {
     
     @ViewBuilder
     private var continuousTasksPerformance: some View {
-        let continuousEvents = viewModel.events.filter { $0.type.isContinuousTaskEvent }
+        let continuousEvents = filteredEvents.filter { $0.type.isContinuousTaskEvent }
         let taskGroups = Dictionary(grouping: continuousEvents) { $0.taskIdentifier }
         
         if !taskGroups.isEmpty {
@@ -2005,5 +2083,21 @@ struct DetailedTaskPerformanceView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Time Range Filtering Extensions
+
+extension TimeRange {
+    var startDate: Date {
+        return Date().addingTimeInterval(-timeInterval)
+    }
+    
+    var endDate: Date {
+        return Date()
+    }
+    
+    func contains(_ date: Date) -> Bool {
+        return date >= startDate && date <= endDate
     }
 }
