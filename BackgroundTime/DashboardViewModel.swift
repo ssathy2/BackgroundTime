@@ -18,7 +18,7 @@ class DashboardViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var error: String?
     
-    private let dataStore = BackgroundTaskDataStore.shared
+    private let dataStore: BackgroundTaskDataStore
     private var cancellables = Set<AnyCancellable>()
     private var currentTimeRange: TimeRange = .last24Hours
     
@@ -27,7 +27,9 @@ class DashboardViewModel: ObservableObject {
         currentTimeRange
     }
     
-    init() {
+    init(dataStore: BackgroundTaskDataStore = BackgroundTaskDataStore.shared) {
+        self.dataStore = dataStore
+        
         // Auto-refresh every 30 seconds
         Timer.publish(every: 30, on: .main, in: .common)
             .autoconnect()

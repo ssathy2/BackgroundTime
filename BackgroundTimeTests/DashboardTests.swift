@@ -608,7 +608,7 @@ extension DashboardTests {
 }
 
 /// Extension to add test-specific functionality to DashboardViewModel for view testing
-private extension DashboardViewModel {
+extension DashboardViewModel {
     /// Simulate error condition for view testing
     func simulateError(_ message: String) async {
         await MainActor.run {

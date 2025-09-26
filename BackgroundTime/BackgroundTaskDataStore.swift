@@ -17,13 +17,13 @@ class BackgroundTaskDataStore {
     private let eventStore: ThreadSafeDataStore<BackgroundTaskEvent>
     private let performanceMonitor = AccessPatternMonitor.shared
     
-    private let userDefaults: UserDefaults?
+    private let userDefaults: UserDefaults
     private let eventsKey = "BackgroundTime.StoredEvents"
     
     private init() {
         // Initialize with default capacity and default UserDefaults suite
         self.eventStore = ThreadSafeDataStore<BackgroundTaskEvent>(capacity: 1000)
-        self.userDefaults = UserDefaults(suiteName: "BackgroundTime.DataStore")
+        self.userDefaults = UserDefaults(suiteName: "BackgroundTime.DataStore") ?? UserDefaults.standard
         loadPersistedEvents()
     }
     
@@ -32,13 +32,6 @@ class BackgroundTaskDataStore {
         self.eventStore = ThreadSafeDataStore<BackgroundTaskEvent>(capacity: 1000)
         self.userDefaults = userDefaults
         loadPersistedEvents()
-    }
-    
-    /// Create a test instance with isolated UserDefaults for testing
-    static func createTestInstance() -> BackgroundTaskDataStore {
-        let testSuiteName = "BackgroundTime.Tests.\(UUID().uuidString)"
-        let testUserDefaults = UserDefaults(suiteName: testSuiteName)!
-        return BackgroundTaskDataStore(userDefaults: testUserDefaults)
     }
     
     func configure(maxStoredEvents: Int) {
@@ -181,14 +174,14 @@ class BackgroundTaskDataStore {
         do {
             let events = eventStore.toArray()
             let data = try JSONEncoder().encode(events)
-            userDefaults?.set(data, forKey: eventsKey)
+            userDefaults.set(data, forKey: eventsKey)
         } catch {
             logger.error("Failed to persist events: \(error.localizedDescription)")
         }
     }
     
     private func loadPersistedEvents() {
-        guard let data = userDefaults?.data(forKey: eventsKey) else { return }
+        guard let data = userDefaults.data(forKey: eventsKey) else { return }
         
         do {
             let events = try JSONDecoder().decode([BackgroundTaskEvent].self, from: data)

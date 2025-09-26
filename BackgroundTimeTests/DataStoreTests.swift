@@ -11,6 +11,21 @@ import UIKit
 import BackgroundTasks
 @testable import BackgroundTime
 
+extension BackgroundTaskDataStore {
+    /// Create a test instance with isolated UserDefaults for testing
+    static func createTestInstance() -> BackgroundTaskDataStore {
+        let testSuiteName = "BackgroundTime.Tests.\(UUID().uuidString)"
+        let testUserDefaults = UserDefaults(suiteName: testSuiteName) ?? UserDefaults.standard
+        return BackgroundTaskDataStore(userDefaults: testUserDefaults)
+    }
+    
+    /// Create a test instance with mock UserDefaults
+    static func createMockInstance() -> BackgroundTaskDataStore {
+        let mockUserDefaults = MockUserDefaults()
+        return BackgroundTaskDataStore(userDefaults: mockUserDefaults)
+    }
+}
+
 @Suite("Data Store Tests")
 struct DataStoreTests {
     
