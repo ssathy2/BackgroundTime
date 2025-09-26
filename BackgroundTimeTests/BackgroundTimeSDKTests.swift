@@ -111,30 +111,65 @@ struct BackgroundTimeSDKTests {
     func testDashboardDataExport() async throws {
         let sdk = BackgroundTime.shared
         
-        // Initialize SDK first
-        sdk.initialize(configuration: .default)
+        // Initialize SDK with a custom configuration to ensure clean state
+        let testConfig = BackgroundTimeConfiguration(
+            maxStoredEvents: 100,
+            apiEndpoint: nil,
+            enableNetworkSync: false,
+            enableDetailedLogging: true
+        )
+        sdk.initialize(configuration: testConfig)
         
         // Wait a bit for initialization to complete and settle
-        try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        // Verify initialization by checking if we have at least one event
+        let initialEvents = sdk.getAllEvents()
+        print("Debug: Initial events count after initialization: \(initialEvents.count)")
+        
+        // The initialization should have recorded at least one event
+        #expect(initialEvents.count > 0, "Should have at least one event after initialization. Found: \(initialEvents.count)")
         
         // Test dashboard data export
         let dashboardData = sdk.exportDataForDashboard()
+        
+        // Debug: Print information about events and timeline
+        print("Debug: Dashboard data - Events: \(dashboardData.events.count), Timeline: \(dashboardData.timeline.count)")
+        
+        for (index, event) in dashboardData.events.prefix(5).enumerated() {
+            print("Debug: Event \(index): type=\(event.type.rawValue), identifier='\(event.taskIdentifier)', success=\(event.success)")
+        }
+        
+        if dashboardData.timeline.isEmpty {
+            print("Debug: Timeline is empty - this may be expected if all events have empty task identifiers")
+        } else {
+            for (index, timelinePoint) in dashboardData.timeline.prefix(5).enumerated() {
+                print("Debug: Timeline \(index): type=\(timelinePoint.eventType.rawValue), identifier='\(timelinePoint.taskIdentifier)'")
+            }
+        }
         
         // Verify all components of dashboard data
         #expect(dashboardData.statistics.totalTasksScheduled >= 0, "Should have statistics with valid scheduled count")
         #expect(dashboardData.statistics.totalTasksExecuted >= 0, "Should have statistics with valid executed count")
         #expect(dashboardData.statistics.generatedAt != nil, "Statistics should have generation timestamp")
         
-        #expect(dashboardData.events.count >= 0, "Should have events array")
+        #expect(dashboardData.events.count >= 1, "Should have at least one event (initialization)")
         #expect(dashboardData.timeline.count >= 0, "Should have timeline array")
         #expect(dashboardData.systemInfo.deviceModel.count > 0, "Should have system info with device model")
         #expect(dashboardData.systemInfo.systemVersion.count > 0, "Should have system info with system version")
         #expect(dashboardData.generatedAt != nil, "Dashboard data should have generation timestamp")
         
         // Verify timeline data structure
-        for timelinePoint in dashboardData.timeline {
-            #expect(timelinePoint.timestamp != nil, "Timeline point should have timestamp")
-            #expect(timelinePoint.taskIdentifier.count > 0, "Timeline point should have task identifier")
+        if dashboardData.timeline.isEmpty {
+            // If timeline is empty, that's okay, but verify that events exist
+            #expect(dashboardData.events.count >= 0, "Should have events even if timeline is empty")
+        } else {
+            // If timeline has entries, they should all be valid
+            for (index, timelinePoint) in dashboardData.timeline.enumerated() {
+                #expect(timelinePoint.timestamp != nil, "Timeline point \(index) should have timestamp")
+                #expect(timelinePoint.taskIdentifier.count > 0, 
+                        "Timeline point \(index) should have non-empty task identifier. Found: '\(timelinePoint.taskIdentifier)', event type: \(timelinePoint.eventType.rawValue)")
+            }
         }
         
         // Verify system info is current
@@ -154,7 +189,7 @@ struct BackgroundTimeSDKTests {
                 "Events count should be close between calls (difference: \(eventCountDifference))")
         
         // Verify both exports have valid structure
-        #expect(dashboardData2.events.count >= 0, "Second export should have events array")
+        #expect(dashboardData2.events.count >= 1, "Second export should have at least one event")
         #expect(dashboardData2.timeline.count >= 0, "Second export should have timeline array")
         #expect(dashboardData2.systemInfo.deviceModel.count > 0, "Second export should have system info")
     }

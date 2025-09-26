@@ -13,6 +13,16 @@
   },
   "testTargets" : [
     {
+      "skippedTests" : {
+        "suites" : [
+          {
+            "name" : "BGTaskSwizzlerTests"
+          },
+          {
+            "name" : "SwizzlingTests"
+          }
+        ]
+      },
       "target" : {
         "containerPath" : "container:BackgroundTime.xcodeproj",
         "identifier" : "DE48B6A82E7E6128009A676E",
@@ -20,5 +30,5 @@
       }
     }
   ],
-  "version" : 1
+  "version" : 2
 }

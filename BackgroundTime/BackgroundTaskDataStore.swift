@@ -34,6 +34,13 @@ class BackgroundTaskDataStore {
         loadPersistedEvents()
     }
     
+    /// Create a test instance with isolated UserDefaults for testing
+    static func createTestInstance() -> BackgroundTaskDataStore {
+        let testSuiteName = "BackgroundTime.Tests.\(UUID().uuidString)"
+        let testUserDefaults = UserDefaults(suiteName: testSuiteName)!
+        return BackgroundTaskDataStore(userDefaults: testUserDefaults)
+    }
+    
     func configure(maxStoredEvents: Int) {
         let startTime = CFAbsoluteTimeGetCurrent()
         

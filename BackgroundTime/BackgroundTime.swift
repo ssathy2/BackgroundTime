@@ -132,7 +132,14 @@ public class BackgroundTime {
     
     private func generateTimelineData(from events: [BackgroundTaskEvent]) -> [TimelineDataPoint] {
         return events.compactMap { event in
-            TimelineDataPoint(
+            // Filter out events with empty task identifiers from timeline
+            // Also ensure we have a valid timestamp
+            guard !event.taskIdentifier.isEmpty,
+                  !event.taskIdentifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { 
+                return nil 
+            }
+            
+            return TimelineDataPoint(
                 timestamp: event.timestamp,
                 eventType: event.type,
                 taskIdentifier: event.taskIdentifier,
