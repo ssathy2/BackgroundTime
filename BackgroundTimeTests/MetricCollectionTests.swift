@@ -172,35 +172,27 @@ struct MetricIntegrationTests {
     
     @Test("BackgroundTaskTracker Basic Usage")
     func testBasicTaskTracking() async throws {
-        let tracker = BackgroundTaskTracker.shared
-        let taskId = "test-task-\(UUID())"
-        
-        // Clear any existing active tasks first
-        // (Since we can't reset the singleton, we'll complete any active tasks)
-        let currentActiveIds = await MainActor.run { tracker.activeTaskIdentifiers }
-        for activeId in currentActiveIds {
-            await tracker.completeExecution(for: activeId)
-        }
-        
-        // Verify no active executions initially (after cleanup)
         await MainActor.run {
+            let tracker = BackgroundTaskTracker.shared
+            let taskId = "test-task-\(UUID())"
+            
+            // Clear any existing active tasks first
+            tracker.cleanupStaleExecutions()
+            
+            // Verify no active executions initially
             #expect(tracker.activeTaskCount == 0)
             #expect(!tracker.isExecuting(taskId))
-        }
-        
-        // Start execution
-        await tracker.startExecution(for: taskId)
-        
-        await MainActor.run {
+            
+            // Start execution
+            tracker.startExecution(for: taskId)
+            
             #expect(tracker.activeTaskCount == 1)
             #expect(tracker.isExecuting(taskId))
             #expect(tracker.activeTaskIdentifiers.contains(taskId))
-        }
-        
-        // Complete execution
-        await tracker.completeExecution(for: taskId)
-        
-        await MainActor.run {
+            
+            // Complete execution
+            tracker.completeExecution(for: taskId)
+            
             #expect(tracker.activeTaskCount == 0)
             #expect(!tracker.isExecuting(taskId))
         }
@@ -210,6 +202,11 @@ struct MetricIntegrationTests {
     func testResultBasedExecution() async throws {
         let tracker = BackgroundTaskTracker.shared
         let taskId = "result-test-\(UUID())"
+        
+        // Clean up first
+        await MainActor.run {
+            tracker.cleanupStaleExecutions()
+        }
         
         // Test successful execution
         let successResult = await tracker.executeTask(identifier: taskId) {
@@ -240,46 +237,33 @@ struct MetricIntegrationTests {
     
     @Test("Concurrent Task Tracking")
     func testConcurrentTaskTracking() async throws {
-        let tracker = BackgroundTaskTracker.shared
-        
-        // Clear any existing active tasks first
-        let currentActiveIds = await MainActor.run { tracker.activeTaskIdentifiers }
-        for activeId in currentActiveIds {
-            await tracker.completeExecution(for: activeId)
-        }
-        
-        let taskCount = 5
-        let taskIds = (0..<taskCount).map { "concurrent-task-\($0)" }
-        
-        // Start all tasks concurrently
-        await withTaskGroup(of: Void.self) { group in
-            for taskId in taskIds {
-                group.addTask {
-                    await tracker.startExecution(for: taskId)
-                }
-            }
-        }
-        
-        // Verify all tasks are active
         await MainActor.run {
+            let tracker = BackgroundTaskTracker.shared
+            
+            // Clear any existing active tasks first
+            tracker.cleanupStaleExecutions()
+            
+            let taskCount = 5
+            let taskIds = (0..<taskCount).map { "concurrent-task-\(UUID())-\($0)" }
+            
+            // Start all tasks
+            for taskId in taskIds {
+                tracker.startExecution(for: taskId)
+            }
+            
+            // Verify all tasks are active
             #expect(tracker.activeTaskCount == taskCount, "Expected \(taskCount) active tasks, got \(tracker.activeTaskCount)")
             
             for taskId in taskIds {
                 #expect(tracker.isExecuting(taskId))
             }
-        }
-        
-        // Complete all tasks
-        await withTaskGroup(of: Void.self) { group in
+            
+            // Complete all tasks
             for taskId in taskIds {
-                group.addTask {
-                    await tracker.completeExecution(for: taskId)
-                }
+                tracker.completeExecution(for: taskId)
             }
-        }
-        
-        // Verify all tasks are completed
-        await MainActor.run {
+            
+            // Verify all tasks are completed
             #expect(tracker.activeTaskCount == 0)
         }
     }
