@@ -1,5 +1,5 @@
 //
-//  BackgroundTimeSDKTests.swift
+//  SDKTests.swift
 //  BackgroundTimeTests
 //
 //  Created by Siddharth Sathyam on 9/19/25.
@@ -13,8 +13,8 @@ import BackgroundTasks
 
 // MARK: - Test Helpers
 
-@Suite("BackgroundTime SDK Core Tests")
-struct BackgroundTimeSDKTests {
+@Suite("SDK Core Tests")
+struct SDKTests {
     
     @Test("SDK Initialization")
     func testSDKInitialization() async throws {

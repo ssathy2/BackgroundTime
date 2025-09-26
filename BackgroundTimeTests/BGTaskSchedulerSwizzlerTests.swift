@@ -1,5 +1,5 @@
 //
-//  MethodSwizzlingTests.swift
+//  BGTaskSchedulerSwizzlerTests.swift
 //  BackgroundTimeTests
 //
 //  Created by Siddharth Sathyam on 9/19/25.
@@ -11,8 +11,8 @@ import UIKit
 import BackgroundTasks
 @testable import BackgroundTime
 
-@Suite("Method Swizzling Comprehensive Tests")
-struct MethodSwizzlingTests {
+@Suite("BGTaskSchedulerSwizzler Comprehensive Tests")
+struct BGTaskSchedulerSwizzlerTests {
     
     @Test("BGTaskSchedulerSwizzler initialization and safety")
     func testBGTaskSchedulerSwizzlerInitialization() async throws {

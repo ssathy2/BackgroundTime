@@ -1,5 +1,5 @@
 //
-//  BackgroundTimeConfigurationTests.swift
+//  ConfigurationTests.swift
 //  BackgroundTimeTests
 //
 //  Created by Siddharth Sathyam on 9/19/25.
@@ -11,8 +11,8 @@ import UIKit
 import BackgroundTasks
 @testable import BackgroundTime
 
-@Suite("BackgroundTimeConfiguration Tests")
-struct BackgroundTimeConfigurationTests {
+@Suite("Configuration Tests")
+struct ConfigurationTests {
     
     @Test("Default BackgroundTimeConfiguration properties")
     func testDefaultConfiguration() async throws {

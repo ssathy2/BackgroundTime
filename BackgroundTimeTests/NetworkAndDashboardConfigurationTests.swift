@@ -181,12 +181,15 @@ struct NetworkAndDashboardConfigurationTests {
         let networkErrors: [NetworkError] = [
             .noEndpointConfigured,
             .invalidResponse,
+            .networkUnavailable,
+            .authenticationFailed,
             .serverError(statusCode: 400),
             .serverError(statusCode: 404),
             .serverError(statusCode: 500),
             .serverError(statusCode: 503),
             .uploadFailed(testError),
-            .downloadFailed(testError)
+            .downloadFailed(testError),
+            .unknownError(testError)
         ]
         
         for error in networkErrors {
@@ -199,6 +202,10 @@ struct NetworkAndDashboardConfigurationTests {
                 #expect(description!.contains("endpoint"), "Should mention endpoint")
             case .invalidResponse:
                 #expect(description!.contains("response"), "Should mention response")
+            case .networkUnavailable:
+                #expect(description!.contains("Network"), "Should mention network")
+            case .authenticationFailed:
+                #expect(description!.contains("Authentication"), "Should mention authentication")
             case .serverError(let statusCode):
                 #expect(description!.contains("\(statusCode)"), "Should contain status code")
             case .uploadFailed(let underlyingError):
@@ -206,6 +213,9 @@ struct NetworkAndDashboardConfigurationTests {
                 #expect(description!.contains(underlyingError.localizedDescription), "Should contain underlying error")
             case .downloadFailed(let underlyingError):
                 #expect(description!.contains("Download"), "Should mention download")
+                #expect(description!.contains(underlyingError.localizedDescription), "Should contain underlying error")
+            case .unknownError(let underlyingError):
+                #expect(description!.contains("Unknown"), "Should mention unknown")
                 #expect(description!.contains(underlyingError.localizedDescription), "Should contain underlying error")
             }
         }

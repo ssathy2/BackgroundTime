@@ -119,7 +119,6 @@ class NetworkManager {
 // MARK: - Network Error Types
 
 enum NetworkError: Error, LocalizedError {
-    case noEndpoint
     case noEndpointConfigured
     case invalidResponse
     case networkUnavailable
@@ -131,8 +130,6 @@ enum NetworkError: Error, LocalizedError {
     
     var errorDescription: String? {
         switch self {
-        case .noEndpoint:
-            return "No API endpoint configured"
         case .noEndpointConfigured:
             return "No API endpoint configured for dashboard sync"
         case .invalidResponse:

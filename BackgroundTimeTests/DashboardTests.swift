@@ -1,5 +1,5 @@
 //
-//  BackgroundTimeDashboardTests.swift
+//  DashboardTests.swift
 //  BackgroundTimeTests
 //
 //  Created by Siddharth Sathyam on 9/26/25.
@@ -11,9 +11,9 @@ import SwiftUI
 import UIKit
 @testable import BackgroundTime
 
-@Suite("BackgroundTimeDashboard Tests")
+@Suite("Dashboard Tests")
 @MainActor
-struct BackgroundTimeDashboardTests {
+struct DashboardTests {
     
     // MARK: - Dashboard Initialization Tests
     
@@ -559,7 +559,7 @@ struct BackgroundTimeDashboardTests {
 
 // MARK: - Helper Functions for Dashboard Tests
 
-extension BackgroundTimeDashboardTests {
+extension DashboardTests {
     
     /// Creates test events specifically for view testing
     private func createTestEventsForView(count: Int) -> [BackgroundTaskEvent] {
