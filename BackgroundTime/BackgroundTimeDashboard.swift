@@ -115,7 +115,7 @@ public struct BackgroundTimeDashboard: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { 
                         Task { @MainActor in
-                            viewModel.refresh()
+                            await viewModel.refresh()
                         }
                     }) {
                         Image(systemName: "arrow.clockwise")
@@ -134,13 +134,13 @@ public struct BackgroundTimeDashboard: View {
         .onAppear {
             Task { @MainActor in
                 if viewModel.events.isEmpty && !viewModel.isLoading {
-                    viewModel.loadData(for: selectedTimeRange)
+                    await viewModel.loadData(for: selectedTimeRange)
                 }
             }
         }
         .onChange(of: selectedTimeRange) { _, newRange in
             Task { @MainActor in
-                viewModel.loadData(for: newRange)
+                await viewModel.loadData(for: newRange)
             }
         }
         .onChange(of: viewModel.error) { _, newError in
@@ -310,7 +310,7 @@ struct OverviewTabView: View {
         }
         .refreshable {
             Task { @MainActor in
-                viewModel.refresh()
+                await viewModel.refresh()
             }
         }
     }
@@ -384,7 +384,7 @@ struct TimelineTabView: View {
         }
         .refreshable {
             Task { @MainActor in
-                viewModel.refresh()
+                await viewModel.refresh()
             }
         }
     }
@@ -447,7 +447,7 @@ struct PerformanceTabView: View {
         }
         .refreshable {
             Task { @MainActor in
-                viewModel.refresh()
+                await viewModel.refresh()
             }
         }
         .sheet(isPresented: $showingDetailedMetrics) {
@@ -1071,7 +1071,7 @@ struct ErrorsTabView: View {
         }
         .refreshable {
             Task { @MainActor in
-                viewModel.refresh()
+                await viewModel.refresh()
             }
         }
     }
@@ -1142,7 +1142,7 @@ struct ContinuousTasksTabView: View {
         }
         .refreshable {
             Task { @MainActor in
-                viewModel.refresh()
+                await viewModel.refresh()
             }
         }
     }

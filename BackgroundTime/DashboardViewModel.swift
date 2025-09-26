@@ -34,12 +34,14 @@ class DashboardViewModel: ObservableObject {
         Timer.publish(every: 30, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
-                self?.refresh()
+                Task { [weak self] in
+                    await self?.refresh()
+                }
             }
             .store(in: &cancellables)
     }
     
-    func loadData(for timeRange: TimeRange) {
+    func loadData(for timeRange: TimeRange) async {
         // Don't reload if we're already showing this time range and not loading
         if currentTimeRange == timeRange && !isLoading {
             return
@@ -49,8 +51,9 @@ class DashboardViewModel: ObservableObject {
         isLoading = true
         error = nil
         
-        Task {
-            do {
+        do {
+            // Perform data operations on a background actor to avoid blocking the main thread
+            let result = await Task.detached { [dataStore] in
                 let endDate = Date()
                 let startDate = Date(timeIntervalSinceNow: -timeRange.timeInterval)
                 
@@ -77,36 +80,41 @@ class DashboardViewModel: ObservableObject {
                     dataStore.getTaskPerformanceMetrics(for: identifier, in: startDate...endDate)
                 }.sorted(by: { $0.taskIdentifier < $1.taskIdentifier })
                 
-                await MainActor.run {
-                    self.statistics = stats
-                    self.events = filteredEvents.sorted(by: { $0.timestamp > $1.timestamp })
-                    self.timelineData = timeline
-                    self.taskMetrics = metrics
-                    
-                    // Process continuous tasks data for iOS 26+
-                    if #available(iOS 26.0, *) {
-                        self.processContinuousTasksData(from: filteredEvents)
-                    }
-                    
-                    self.isLoading = false
-                }
-                
-            } catch {
-                await MainActor.run {
-                    self.error = error.localizedDescription
-                    self.isLoading = false
-                }
+                return (
+                    statistics: stats,
+                    events: filteredEvents.sorted(by: { $0.timestamp > $1.timestamp }),
+                    timeline: timeline,
+                    metrics: metrics,
+                    filteredEvents: filteredEvents
+                )
+            }.value
+            
+            // Update UI on main actor
+            self.statistics = result.statistics
+            self.events = result.events
+            self.timelineData = result.timeline
+            self.taskMetrics = result.metrics
+            
+            // Process continuous tasks data for iOS 26+
+            if #available(iOS 26.0, *) {
+                self.processContinuousTasksData(from: result.filteredEvents)
             }
+            
+            self.isLoading = false
+            
+        } catch {
+            self.error = error.localizedDescription
+            self.isLoading = false
         }
     }
     
-    func refresh() {
-        loadData(for: currentTimeRange)
+    func refresh() async {
+        await loadData(for: currentTimeRange)
     }
     
-    func clearAllData() {
+    func clearAllData() async {
         dataStore.clearAllEvents()
-        loadData(for: currentTimeRange)
+        await loadData(for: currentTimeRange)
     }
     
     func exportData() -> BackgroundTaskDashboardData {
@@ -117,10 +125,15 @@ class DashboardViewModel: ObservableObject {
         do {
             try await BackgroundTime.shared.syncWithDashboard()
         } catch {
-            await MainActor.run {
-                self.error = "Sync failed: \(error.localizedDescription)"
-            }
+            self.error = "Sync failed: \(error.localizedDescription)"
         }
+    }
+    
+    // MARK: - Testing Support
+    
+    /// For testing purposes only - simulates an error state
+    func simulateError(_ message: String) async {
+        self.error = message
     }
     
     // MARK: - Continuous Tasks Support (iOS 26.0+)
