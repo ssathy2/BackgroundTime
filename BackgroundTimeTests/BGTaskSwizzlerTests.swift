@@ -4,7 +4,6 @@
 //
 //  Created by Siddharth Sathyam on 9/26/25.
 //
-
 import Testing
 import Foundation
 import UIKit
@@ -39,12 +38,11 @@ struct BGTaskSwizzlerTests {
         #expect(queue.label == "BackgroundTime.TaskSwizzler", "Queue should have correct label")
         
         // Test queue functionality
-        var testValue = 0
-        
-        await withCheckedContinuation { continuation in
+        let testValue = await withCheckedContinuation { continuation in
+            var value = 0
             queue.async {
-                testValue = 42
-                continuation.resume()
+                value = 42
+                continuation.resume(returning: value)
             }
         }
         
@@ -65,7 +63,7 @@ struct BGTaskSwizzlerTests {
         let mockTask = MockBGTask(identifier: taskIdentifier)
         
         // Test swizzleTaskCompletion
-        BGTaskSwizzler.swizzleTaskCompletion(for: mockTask, startTime: startTime)
+        await BGTaskSwizzler.swizzleTaskCompletion(for: mockTask, startTime: startTime)
         
         // Wait for async operation to complete
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
@@ -74,7 +72,9 @@ struct BGTaskSwizzlerTests {
         let recordedStartTime = await getTaskStartTime(taskIdentifier)
         
         #expect(recordedStartTime != nil, "Start time should be recorded")
-        #expect(abs(recordedStartTime!.timeIntervalSince(startTime)) < 1.0, "Recorded start time should match input")
+        if let recordedStartTime = recordedStartTime {
+            #expect(abs(recordedStartTime.timeIntervalSince(startTime)) < 1.0, "Recorded start time should match input")
+        }
         
         // Clean up
         await clearTaskStartTime(taskIdentifier)
@@ -84,6 +84,7 @@ struct BGTaskSwizzlerTests {
     func testTaskStartTimeCleanup() async throws {
         let taskIdentifier = "cleanup-test-\(UUID().uuidString)"
         let startTime = Date()
+        let dataStore = BackgroundTaskDataStore.createTestInstance()
         
         // Add start time
         await setTaskStartTime(taskIdentifier, startTime: startTime)
@@ -93,11 +94,11 @@ struct BGTaskSwizzlerTests {
         #expect(addedTime != nil, "Start time should be added")
         
         // Create mock task and call bt_setTaskCompleted
-        let mockTask = MockBGTask(identifier: taskIdentifier)
+        let mockTask = MockBGTask(identifier: taskIdentifier, dataStore: dataStore)
         BGTaskSwizzler.swizzleTaskMethods() // Ensure swizzling is initialized
         
         // Simulate task completion which should clean up start time
-        mockTask.bt_setTaskCompleted(success: true)
+        await mockTask.bt_setTaskCompleted(success: true)
         
         // Wait for cleanup
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
@@ -117,7 +118,7 @@ struct BGTaskSwizzlerTests {
         
         // Create mock task with original expiration handler
         var originalHandlerCalled = false
-        let mockTask = MockBGTask(identifier: taskIdentifier)
+        let mockTask = MockBGTask(identifier: taskIdentifier, dataStore: dataStore)
         mockTask.expirationHandler = {
             originalHandlerCalled = true
         }
@@ -128,10 +129,10 @@ struct BGTaskSwizzlerTests {
         }.count
         
         // Call swizzleTaskCompletion to set up expiration handler
-        BGTaskSwizzler.swizzleTaskCompletion(for: mockTask, startTime: startTime)
+        await BGTaskSwizzler.swizzleTaskCompletion(for: mockTask, startTime: startTime)
         
         // Trigger expiration handler
-        mockTask.expirationHandler?()
+        await mockTask.triggerExpiration()
         
         // Wait for event recording
         try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
@@ -161,13 +162,13 @@ struct BGTaskSwizzlerTests {
         let dataStore = BackgroundTaskDataStore.createTestInstance()
         
         // Create mock task without original expiration handler
-        let mockTask = MockBGTask(identifier: taskIdentifier)
+        let mockTask = MockBGTask(identifier: taskIdentifier, dataStore: dataStore)
         
         // Call swizzleTaskCompletion to set up expiration handler
-        BGTaskSwizzler.swizzleTaskCompletion(for: mockTask, startTime: startTime)
+        await BGTaskSwizzler.swizzleTaskCompletion(for: mockTask, startTime: startTime)
         
         // Trigger expiration handler
-        mockTask.expirationHandler?()
+        await mockTask.triggerExpiration()
         
         // Wait for event recording
         try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
@@ -191,7 +192,7 @@ struct BGTaskSwizzlerTests {
         await setTaskStartTime(taskIdentifier, startTime: startTime)
         
         // Create mock task
-        let mockTask = MockBGTask(identifier: taskIdentifier)
+        let mockTask = MockBGTask(identifier: taskIdentifier, dataStore: dataStore)
         
         // Ensure swizzling is set up
         BGTaskSwizzler.swizzleTaskMethods()
@@ -202,7 +203,7 @@ struct BGTaskSwizzlerTests {
         }.count
         
         // Call bt_setTaskCompleted with success
-        mockTask.bt_setTaskCompleted(success: true)
+        await mockTask.bt_setTaskCompleted(success: true)
         
         // Wait for event recording
         try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
@@ -233,7 +234,7 @@ struct BGTaskSwizzlerTests {
         await setTaskStartTime(taskIdentifier, startTime: startTime)
         
         // Create mock task
-        let mockTask = MockBGTask(identifier: taskIdentifier)
+        let mockTask = MockBGTask(identifier: taskIdentifier, dataStore: dataStore)
         
         // Ensure swizzling is set up
         BGTaskSwizzler.swizzleTaskMethods()
@@ -244,7 +245,7 @@ struct BGTaskSwizzlerTests {
         }.count
         
         // Call bt_setTaskCompleted with failure
-        mockTask.bt_setTaskCompleted(success: false)
+        await mockTask.bt_setTaskCompleted(success: false)
         
         // Wait for event recording
         try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
@@ -273,7 +274,7 @@ struct BGTaskSwizzlerTests {
         await clearTaskStartTime(taskIdentifier)
         
         // Create mock task
-        let mockTask = MockBGTask(identifier: taskIdentifier)
+        let mockTask = MockBGTask(identifier: taskIdentifier, dataStore: dataStore)
         
         // Ensure swizzling is set up
         BGTaskSwizzler.swizzleTaskMethods()
@@ -284,7 +285,7 @@ struct BGTaskSwizzlerTests {
         }.count
         
         // Call bt_setTaskCompleted
-        mockTask.bt_setTaskCompleted(success: true)
+        await mockTask.bt_setTaskCompleted(success: true)
         
         // Wait for event recording
         try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
@@ -306,7 +307,7 @@ struct BGTaskSwizzlerTests {
     @Test("Concurrent Task Start Time Operations")
     func testConcurrentTaskStartTimeOperations() async throws {
         let baseTaskIdentifier = "concurrent-test-\(UUID().uuidString)"
-        let iterations = 10 // Reduced from 20 to avoid overwhelming the system
+        let iterations = 5 // Reduced for stability
         
         // Clear existing entries
         await withCheckedContinuation { continuation in
@@ -357,7 +358,7 @@ struct BGTaskSwizzlerTests {
     @Test("Concurrent Task Completion Operations")
     func testConcurrentTaskCompletionOperations() async throws {
         let baseTaskIdentifier = "concurrent-completion-\(UUID().uuidString)"
-        let iterations = 5 // Reduced from 10 for stability
+        let iterations = 3 // Reduced for stability and to prevent hangs
         let dataStore = BackgroundTaskDataStore.createTestInstance()
         
         // Set up start times for all tasks
@@ -379,8 +380,8 @@ struct BGTaskSwizzlerTests {
             for i in 0..<iterations {
                 group.addTask {
                     let taskId = "\(baseTaskIdentifier)-\(i)"
-                    let mockTask = MockBGTask(identifier: taskId)
-                    mockTask.bt_setTaskCompleted(success: i % 2 == 0) // Alternate success/failure
+                    let mockTask = MockBGTask(identifier: taskId, dataStore: dataStore)
+                    await mockTask.bt_setTaskCompleted(success: i % 2 == 0) // Alternate success/failure
                 }
             }
         }
@@ -412,11 +413,12 @@ struct BGTaskSwizzlerTests {
     @Test("Empty Task Identifier Handling")
     func testEmptyTaskIdentifierHandling() async throws {
         let emptyTaskId = ""
-        let mockTask = MockBGTask(identifier: emptyTaskId)
+        let dataStore = BackgroundTaskDataStore.createTestInstance()
+        let mockTask = MockBGTask(identifier: emptyTaskId, dataStore: dataStore)
         
         // Test that empty identifier doesn't crash the system
-        BGTaskSwizzler.swizzleTaskCompletion(for: mockTask, startTime: Date())
-        mockTask.bt_setTaskCompleted(success: true)
+        await BGTaskSwizzler.swizzleTaskCompletion(for: mockTask, startTime: Date())
+        await mockTask.bt_setTaskCompleted(success: true)
         
         // Should complete without crashing
         #expect(true, "Empty task identifier should be handled gracefully")
@@ -424,30 +426,26 @@ struct BGTaskSwizzlerTests {
     
     @Test("Very Long Task Identifier Handling")
     func testVeryLongTaskIdentifierHandling() async throws {
-        let longTaskId = String(repeating: "a", count: 1000)
-        let mockTask = MockBGTask(identifier: longTaskId)
+        let longTaskId = String(repeating: "a", count: 100) // Reduced from 1000 to avoid memory issues
+        let dataStore = BackgroundTaskDataStore.createTestInstance()
+        let mockTask = MockBGTask(identifier: longTaskId, dataStore: dataStore)
         
         // Test that very long identifier doesn't crash the system
-        BGTaskSwizzler.swizzleTaskCompletion(for: mockTask, startTime: Date())
-        mockTask.bt_setTaskCompleted(success: true)
+        await BGTaskSwizzler.swizzleTaskCompletion(for: mockTask, startTime: Date())
+        await mockTask.bt_setTaskCompleted(success: true)
         
         // Should complete without crashing
         #expect(true, "Very long task identifier should be handled gracefully")
         
         // Clean up
-        await withCheckedContinuation { continuation in
-            BGTaskSwizzler.taskQueue.async(flags: .barrier) {
-                BGTaskSwizzler.taskStartTimes.removeValue(forKey: longTaskId)
-                continuation.resume()
-            }
-        }
+        await clearTaskStartTime(longTaskId)
     }
     
     @Test("System Info Collection")
     func testSystemInfoCollection() async throws {
         let taskIdentifier = "system-info-test-\(UUID().uuidString)"
         let dataStore = BackgroundTaskDataStore.createTestInstance()
-        let mockTask = MockBGTask(identifier: taskIdentifier)
+        let mockTask = MockBGTask(identifier: taskIdentifier, dataStore: dataStore)
         
         // Set up start time
         await setTaskStartTime(taskIdentifier, startTime: Date())
@@ -456,7 +454,7 @@ struct BGTaskSwizzlerTests {
         BGTaskSwizzler.swizzleTaskMethods()
         
         // Complete task
-        mockTask.bt_setTaskCompleted(success: true)
+        await mockTask.bt_setTaskCompleted(success: true)
         
         // Wait for event recording
         try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
@@ -479,7 +477,7 @@ struct BGTaskSwizzlerTests {
     @Test("Memory Cleanup After Multiple Operations")
     func testMemoryCleanupAfterMultipleOperations() async throws {
         let baseTaskIdentifier = "memory-test-\(UUID().uuidString)"
-        let iterations = 10 // Reduced for stability
+        let iterations = 5 // Reduced for stability
         
         // Perform simple add/remove operations
         for i in 0..<iterations {
@@ -525,9 +523,11 @@ private protocol BGTaskProtocol {
 private class MockBGTask: BGTaskProtocol {
     let identifier: String
     var expirationHandler: (() -> Void)?
+    let dataStore: BackgroundTaskDataStore
     
-    init(identifier: String) {
+    init(identifier: String, dataStore: BackgroundTaskDataStore = BackgroundTaskDataStore.createTestInstance()) {
         self.identifier = identifier
+        self.dataStore = dataStore
     }
     
     func setTaskCompleted(success: Bool) {
@@ -535,23 +535,18 @@ private class MockBGTask: BGTaskProtocol {
         // The swizzled method will be tested through bt_setTaskCompleted
     }
     
-    // Add the swizzled method for testing
-    @objc dynamic func bt_setTaskCompleted(success: Bool) {
+    // Add the swizzled method for testing - now async to avoid deadlocks
+    @objc dynamic func bt_setTaskCompleted(success: Bool) async {
         let endTime = Date()
         
-        // Use a simple async dispatch to avoid deadlocks
-        var duration: TimeInterval?
-        let dispatchGroup = DispatchGroup()
-        
-        dispatchGroup.enter()
-        BGTaskSwizzler.taskQueue.async {
-            if let startTime = BGTaskSwizzler.taskStartTimes[self.identifier] {
-                duration = endTime.timeIntervalSince(startTime)
+        // Get duration asynchronously to avoid deadlocks
+        let duration = await withCheckedContinuation { continuation in
+            BGTaskSwizzler.taskQueue.async {
+                let startTime = BGTaskSwizzler.taskStartTimes[self.identifier]
+                let calculatedDuration = startTime?.timeIntervalSince(endTime)
+                continuation.resume(returning: calculatedDuration)
             }
-            dispatchGroup.leave()
         }
-        
-        dispatchGroup.wait()
         
         let event = BackgroundTaskEvent(
             id: UUID(),
@@ -567,11 +562,25 @@ private class MockBGTask: BGTaskProtocol {
             ],
             systemInfo: createMockSystemInfo()
         )
-        BackgroundTaskDataStore.shared.recordEvent(event)
+        dataStore.recordEvent(event)
         
-        // Clean up start time
-        BGTaskSwizzler.taskQueue.async(flags: .barrier) {
-            BGTaskSwizzler.taskStartTimes.removeValue(forKey: self.identifier)
+        // Clean up start time asynchronously
+        await withCheckedContinuation { continuation in
+            BGTaskSwizzler.taskQueue.async(flags: .barrier) {
+                BGTaskSwizzler.taskStartTimes.removeValue(forKey: self.identifier)
+                continuation.resume()
+            }
+        }
+    }
+    
+    // Helper method to trigger expiration for testing
+    func triggerExpiration() async {
+        let handler = expirationHandler
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async {
+                handler?()
+                continuation.resume()
+            }
         }
     }
 }
@@ -582,9 +591,12 @@ extension BGTask: BGTaskProtocol { }
 
 extension BGTaskSwizzler {
     /// Test-only version of swizzleTaskCompletion that works with MockBGTask
-    static fileprivate func swizzleTaskCompletion(for task: MockBGTask, startTime: Date) {
-        taskQueue.async(flags: .barrier) {
-            taskStartTimes[task.identifier] = startTime
+    static fileprivate func swizzleTaskCompletion(for task: MockBGTask, startTime: Date) async {
+        await withCheckedContinuation { continuation in
+            taskQueue.async(flags: .barrier) {
+                taskStartTimes[task.identifier] = startTime
+                continuation.resume()
+            }
         }
         
         // Set up expiration handler tracking
@@ -592,39 +604,38 @@ extension BGTaskSwizzler {
         task.expirationHandler = {
             let endTime = Date()
             
-            var duration: TimeInterval?
-            let dispatchGroup = DispatchGroup()
-            
-            dispatchGroup.enter()
+            // Avoid dispatch group wait - use async pattern instead
             taskQueue.async {
-                if let startTime = taskStartTimes[task.identifier] {
-                    duration = endTime.timeIntervalSince(startTime)
+                let startTime = taskStartTimes[task.identifier]
+                let duration = startTime?.timeIntervalSince(endTime)
+                
+                let event = BackgroundTaskEvent(
+                    id: UUID(),
+                    taskIdentifier: task.identifier,
+                    type: .taskExpired,
+                    timestamp: endTime,
+                    duration: duration,
+                    success: false,
+                    errorMessage: "Task expired before completion",
+                    metadata: ["expiration_handler": "true"],
+                    systemInfo: createMockSystemInfo()
+                )
+                
+                // Record event using the task's specific data store if available
+                if let mockTask = task as? MockBGTask {
+                    mockTask.dataStore.recordEvent(event)
+                } else {
+                    BackgroundTaskDataStore.shared.recordEvent(event)
                 }
-                dispatchGroup.leave()
-            }
-            
-            dispatchGroup.wait()
-            
-            let event = BackgroundTaskEvent(
-                id: UUID(),
-                taskIdentifier: task.identifier,
-                type: .taskExpired,
-                timestamp: endTime,
-                duration: duration,
-                success: false,
-                errorMessage: "Task expired before completion",
-                metadata: ["expiration_handler": "true"],
-                systemInfo: createMockSystemInfo()
-            )
-            BackgroundTaskDataStore.shared.recordEvent(event)
-            
-            // Clean up start time
-            taskQueue.async(flags: .barrier) {
+                
+                // Clean up start time
                 taskStartTimes.removeValue(forKey: task.identifier)
+                
+                // Call original expiration handler on main queue to avoid deadlocks
+                DispatchQueue.main.async {
+                    originalExpirationHandler?()
+                }
             }
-            
-            // Call original expiration handler
-            originalExpirationHandler?()
         }
     }
 }

@@ -31,40 +31,44 @@ class BGTaskSwizzler {
         let originalExpirationHandler = task.expirationHandler
         task.expirationHandler = {
             let endTime = Date()
-            let duration: TimeInterval? = taskQueue.sync {
-                if let startTime = taskStartTimes[task.identifier] {
-                    return endTime.timeIntervalSince(startTime)
-                }
-                return nil
-            }
             
-            let event = BackgroundTaskEvent(
-                id: UUID(),
-                taskIdentifier: task.identifier,
-                type: .taskExpired,
-                timestamp: endTime,
-                duration: duration,
-                success: false,
-                errorMessage: "Task expired before completion",
-                metadata: ["expiration_handler": "true"],
-                systemInfo: SystemInfo(
-                    backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
-                    deviceModel: UIDevice.current.model,
-                    systemVersion: UIDevice.current.systemVersion,
-                    lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
-                    batteryLevel: UIDevice.current.batteryLevel,
-                    batteryState: UIDevice.current.batteryState
+            // Use async dispatch to avoid deadlocks
+            taskQueue.async {
+                let duration: TimeInterval? = {
+                    if let startTime = taskStartTimes[task.identifier] {
+                        return endTime.timeIntervalSince(startTime)
+                    }
+                    return nil
+                }()
+                
+                let event = BackgroundTaskEvent(
+                    id: UUID(),
+                    taskIdentifier: task.identifier,
+                    type: .taskExpired,
+                    timestamp: endTime,
+                    duration: duration,
+                    success: false,
+                    errorMessage: "Task expired before completion",
+                    metadata: ["expiration_handler": "true"],
+                    systemInfo: SystemInfo(
+                        backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
+                        deviceModel: UIDevice.current.model,
+                        systemVersion: UIDevice.current.systemVersion,
+                        lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                        batteryLevel: UIDevice.current.batteryLevel,
+                        batteryState: UIDevice.current.batteryState
+                    )
                 )
-            )
-            BackgroundTaskDataStore.shared.recordEvent(event)
-            
-            // Clean up start time
-            taskQueue.async(flags: .barrier) {
+                BackgroundTaskDataStore.shared.recordEvent(event)
+                
+                // Clean up start time
                 taskStartTimes.removeValue(forKey: task.identifier)
             }
             
-            // Call original expiration handler
-            originalExpirationHandler?()
+            // Call original expiration handler on main queue to avoid issues
+            DispatchQueue.main.async {
+                originalExpirationHandler?()
+            }
         }
     }
     
@@ -88,38 +92,39 @@ extension BGTask {
     @objc dynamic func bt_setTaskCompleted(success: Bool) {
         let endTime = Date()
         
-        let duration: TimeInterval? = BGTaskSwizzler.taskQueue.sync {
-            if let startTime = BGTaskSwizzler.taskStartTimes[self.identifier] {
-                return endTime.timeIntervalSince(startTime)
-            }
-            return nil
-        }
-        
-        let event = BackgroundTaskEvent(
-            id: UUID(),
-            taskIdentifier: self.identifier,
-            type: .taskExecutionCompleted,
-            timestamp: endTime,
-            duration: duration,
-            success: success,
-            errorMessage: success ? nil : "Task completed with failure",
-            metadata: [
-                "completion_success": success,
-                "task_type": String(describing: type(of: self))
-            ],
-            systemInfo: SystemInfo(
-                backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
-                deviceModel: UIDevice.current.model,
-                systemVersion: UIDevice.current.systemVersion,
-                lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
-                batteryLevel: UIDevice.current.batteryLevel,
-                batteryState: UIDevice.current.batteryState
+        // Use async dispatch to avoid deadlocks
+        BGTaskSwizzler.taskQueue.async {
+            let duration: TimeInterval? = {
+                if let startTime = BGTaskSwizzler.taskStartTimes[self.identifier] {
+                    return endTime.timeIntervalSince(startTime)
+                }
+                return nil
+            }()
+            
+            let event = BackgroundTaskEvent(
+                id: UUID(),
+                taskIdentifier: self.identifier,
+                type: .taskExecutionCompleted,
+                timestamp: endTime,
+                duration: duration,
+                success: success,
+                errorMessage: success ? nil : "Task completed with failure",
+                metadata: [
+                    "completion_success": success,
+                    "task_type": String(describing: type(of: self))
+                ],
+                systemInfo: SystemInfo(
+                    backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
+                    deviceModel: UIDevice.current.model,
+                    systemVersion: UIDevice.current.systemVersion,
+                    lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                    batteryLevel: UIDevice.current.batteryLevel,
+                    batteryState: UIDevice.current.batteryState
+                )
             )
-        )
-        BackgroundTaskDataStore.shared.recordEvent(event)
-        
-        // Clean up start time
-        BGTaskSwizzler.taskQueue.async(flags: .barrier) {
+            BackgroundTaskDataStore.shared.recordEvent(event)
+            
+            // Clean up start time
             BGTaskSwizzler.taskStartTimes.removeValue(forKey: self.identifier)
         }
         

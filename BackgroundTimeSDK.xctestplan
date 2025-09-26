@@ -16,9 +16,6 @@
       "skippedTests" : {
         "suites" : [
           {
-            "name" : "BGTaskSwizzlerTests"
-          },
-          {
             "name" : "SwizzlingTests"
           }
         ]
