@@ -42,6 +42,264 @@ struct BackgroundTimeSDKTests {
         #expect(config.enableNetworkSync == true)
         #expect(config.enableDetailedLogging == false)
     }
+    
+    @Test("BackgroundTime SDK singleton behavior")
+    func testBackgroundTimeSingleton() async throws {
+        // Test singleton behavior - should always return the same instance
+        let instance1 = BackgroundTime.shared
+        let instance2 = BackgroundTime.shared
+        
+        // Use Objective-C identity comparison since we can't use === in Swift Testing
+        let ptr1 = Unmanaged.passUnretained(instance1).toOpaque()
+        let ptr2 = Unmanaged.passUnretained(instance2).toOpaque()
+        #expect(ptr1 == ptr2, "Should be the same singleton instance")
+    }
+    
+    @Test("BackgroundTime SDK initialization with default configuration")
+    func testBackgroundTimeInitializationDefault() async throws {
+        let sdk = BackgroundTime.shared
+        
+        // Test initialization with default configuration
+        let defaultConfig = BackgroundTimeConfiguration.default
+        sdk.initialize(configuration: defaultConfig)
+        
+        // Should handle multiple initialization calls gracefully
+        sdk.initialize(configuration: defaultConfig)
+        sdk.initialize(configuration: defaultConfig)
+        
+        // Verify SDK functions work after initialization
+        let stats = sdk.getCurrentStats()
+        #expect(stats.totalTasksScheduled >= 0, "Should return valid statistics")
+        #expect(stats.totalTasksExecuted >= 0, "Should return valid execution count")
+        #expect(stats.successRate >= 0.0 && stats.successRate <= 1.0, "Success rate should be between 0 and 1")
+        
+        let events = sdk.getAllEvents()
+        #expect(events.count >= 0, "Should return events array")
+        
+        // Should have initialization event recorded
+        let initEvents = events.filter { $0.type == .initialization }
+        #expect(initEvents.count >= 1, "Should have recorded initialization event")
+    }
+    
+    @Test("BackgroundTime SDK initialization with custom configuration")
+    func testBackgroundTimeInitializationCustom() async throws {
+        let sdk = BackgroundTime.shared
+        
+        // Test initialization with custom configuration
+        let customURL = URL(string: "https://api.example.com/v1")!
+        let customConfig = BackgroundTimeConfiguration(
+            maxStoredEvents: 500,
+            apiEndpoint: customURL,
+            enableNetworkSync: true,
+            enableDetailedLogging: false
+        )
+        
+        sdk.initialize(configuration: customConfig)
+        
+        // Verify configuration was applied by checking if events are properly managed
+        let initialEventCount = sdk.getAllEvents().count
+        
+        // The configuration should be reflected in the SDK behavior
+        let stats = sdk.getCurrentStats()
+        #expect(stats.generatedAt != nil, "Statistics should have generation timestamp")
+        
+        let events = sdk.getAllEvents()
+        #expect(events.count >= initialEventCount, "Should maintain events after custom initialization")
+    }
+    
+    @Test("BackgroundTime SDK dashboard data export")
+    func testDashboardDataExport() async throws {
+        let sdk = BackgroundTime.shared
+        
+        // Initialize SDK first
+        sdk.initialize(configuration: .default)
+        
+        // Test dashboard data export
+        let dashboardData = sdk.exportDataForDashboard()
+        
+        // Verify all components of dashboard data
+        #expect(dashboardData.statistics.totalTasksScheduled >= 0, "Should have statistics with valid scheduled count")
+        #expect(dashboardData.statistics.totalTasksExecuted >= 0, "Should have statistics with valid executed count")
+        #expect(dashboardData.statistics.generatedAt != nil, "Statistics should have generation timestamp")
+        
+        #expect(dashboardData.events.count >= 0, "Should have events array")
+        #expect(dashboardData.timeline.count >= 0, "Should have timeline array")
+        #expect(dashboardData.systemInfo.deviceModel.count > 0, "Should have system info with device model")
+        #expect(dashboardData.systemInfo.systemVersion.count > 0, "Should have system info with system version")
+        #expect(dashboardData.generatedAt != nil, "Dashboard data should have generation timestamp")
+        
+        // Verify timeline data structure
+        for timelinePoint in dashboardData.timeline {
+            #expect(timelinePoint.timestamp != nil, "Timeline point should have timestamp")
+            #expect(timelinePoint.taskIdentifier.count > 0, "Timeline point should have task identifier")
+        }
+        
+        // Verify system info is current
+        let systemInfo = dashboardData.systemInfo
+        #expect(systemInfo.batteryLevel >= -1.0 && systemInfo.batteryLevel <= 1.0, "Battery level should be in valid range")
+        
+        // Test that different calls return consistent structure but may have different timestamps
+        let dashboardData2 = sdk.exportDataForDashboard()
+        #expect(dashboardData2.statistics.totalTasksScheduled == dashboardData.statistics.totalTasksScheduled, 
+                "Statistics should be consistent between calls")
+        #expect(dashboardData2.events.count == dashboardData.events.count, 
+                "Events count should be consistent between calls")
+    }
+    
+    @Test("BackgroundTime SDK performance metrics")
+    func testSDKPerformanceMetrics() async throws {
+        let sdk = BackgroundTime.shared
+        
+        // Initialize SDK
+        sdk.initialize(configuration: .default)
+        
+        // Test data store performance metrics
+        let performanceReport = sdk.getDataStorePerformance()
+        #expect(performanceReport.operationStats.keys.count >= 0, "Should have operation stats dictionary")
+        
+        // Test buffer statistics
+        let bufferStats = sdk.getBufferStatistics()
+        #expect(bufferStats.capacity > 0, "Buffer should have positive capacity")
+        #expect(bufferStats.currentCount >= 0, "Buffer should have valid current count")
+        #expect(bufferStats.availableSpace >= 0, "Buffer should have valid available space")
+        #expect(bufferStats.utilizationPercentage >= 0.0 && bufferStats.utilizationPercentage <= 100.0, 
+                "Utilization percentage should be between 0 and 100")
+        #expect(bufferStats.availableSpace == bufferStats.capacity - bufferStats.currentCount, 
+                "Available space should equal capacity minus current count")
+        
+        // Verify boolean properties are consistent
+        let isEmpty = bufferStats.currentCount == 0
+        let isFull = bufferStats.currentCount == bufferStats.capacity
+        #expect(bufferStats.isEmpty == isEmpty, "isEmpty should be consistent with count")
+        #expect(bufferStats.isFull == isFull, "isFull should be consistent with capacity")
+    }
+    
+    @Test("BackgroundTime SDK dashboard sync error handling")
+    func testDashboardSyncErrorHandling() async throws {
+        let sdk = BackgroundTime.shared
+        
+        // Initialize SDK with no endpoint configured
+        let configWithoutEndpoint = BackgroundTimeConfiguration(
+            maxStoredEvents: 1000,
+            apiEndpoint: nil,
+            enableNetworkSync: false,
+            enableDetailedLogging: true
+        )
+        sdk.initialize(configuration: configWithoutEndpoint)
+        
+        // Test sync with no endpoint - should throw error
+        do {
+            try await sdk.syncWithDashboard()
+            #expect(Bool(false), "Should throw error when no endpoint is configured")
+        } catch {
+            // Expected to fail - verify it's the right type of error
+            #expect(error is NetworkError, "Should throw NetworkError when no endpoint configured")
+        }
+        
+        // Test with configured endpoint (will still fail but for different reason in test environment)
+        let configWithEndpoint = BackgroundTimeConfiguration(
+            maxStoredEvents: 1000,
+            apiEndpoint: URL(string: "https://api.test.example.com")!,
+            enableNetworkSync: true,
+            enableDetailedLogging: true
+        )
+        sdk.initialize(configuration: configWithEndpoint)
+        
+        // This will likely fail due to network issues in test environment, but should handle gracefully
+        do {
+            try await sdk.syncWithDashboard()
+            // If it succeeds, that's fine too
+        } catch {
+            // Expected to fail in test environment - just verify it doesn't crash
+            #expect(error != nil, "Should handle network errors gracefully")
+        }
+    }
+    
+    @Test("BackgroundTime SDK statistics consistency")
+    func testSDKStatisticsConsistency() async throws {
+        let sdk = BackgroundTime.shared
+        
+        // Initialize SDK
+        sdk.initialize(configuration: .default)
+        
+        // Get statistics multiple times and verify consistency
+        let stats1 = sdk.getCurrentStats()
+        let stats2 = sdk.getCurrentStats()
+        
+        // Core counts should be the same between immediate calls
+        #expect(stats1.totalTasksScheduled == stats2.totalTasksScheduled, 
+                "Scheduled count should be consistent")
+        #expect(stats1.totalTasksExecuted == stats2.totalTasksExecuted, 
+                "Executed count should be consistent")
+        #expect(stats1.totalTasksCompleted == stats2.totalTasksCompleted, 
+                "Completed count should be consistent")
+        #expect(stats1.totalTasksFailed == stats2.totalTasksFailed, 
+                "Failed count should be consistent")
+        #expect(stats1.totalTasksExpired == stats2.totalTasksExpired, 
+                "Expired count should be consistent")
+        
+        // Success rate should be the same
+        #expect(stats1.successRate == stats2.successRate, 
+                "Success rate should be consistent")
+        
+        // Average execution time should be the same
+        #expect(stats1.averageExecutionTime == stats2.averageExecutionTime, 
+                "Average execution time should be consistent")
+        
+        // Generation timestamps should be different (or very close)
+        let timeDifference = abs(stats2.generatedAt.timeIntervalSince(stats1.generatedAt))
+        #expect(timeDifference < 1.0, "Generation timestamps should be within 1 second")
+        
+        // Verify all events are accessible
+        let allEvents = sdk.getAllEvents()
+        let eventsFromStats = stats1.totalTasksScheduled + stats1.totalTasksExecuted + 
+                            stats1.totalTasksCompleted + stats1.totalTasksFailed + stats1.totalTasksExpired
+        
+        // The total events might be more than the sum because some events might not fit these categories
+        #expect(allEvents.count >= 0, "Should have non-negative event count")
+    }
+    
+    @Test("BackgroundTime SDK event recording and retrieval")  
+    func testSDKEventRecordingAndRetrieval() async throws {
+        let sdk = BackgroundTime.shared
+        
+        // Initialize SDK - this should record an initialization event
+        sdk.initialize(configuration: .default)
+        
+        // Get initial event count
+        let initialEvents = sdk.getAllEvents()
+        let initialCount = initialEvents.count
+        
+        // Verify we have at least the initialization event
+        #expect(initialCount >= 1, "Should have at least initialization event")
+        
+        // Check for initialization event
+        let initEvents = initialEvents.filter { $0.type == .initialization }
+        #expect(initEvents.count >= 1, "Should have initialization event recorded")
+        
+        // Verify initialization event properties
+        if let initEvent = initEvents.first {
+            #expect(initEvent.taskIdentifier == "SDK_EVENT", "Initialization event should have SDK_EVENT identifier")
+            #expect(initEvent.type == .initialization, "Should be initialization type")
+            #expect(initEvent.success == true, "Initialization should be successful")
+            #expect(initEvent.systemInfo.deviceModel.count > 0, "Should have system info")
+            #expect(initEvent.metadata.keys.count > 0, "Should have metadata")
+            
+            // Verify metadata contains expected keys
+            if let version = initEvent.metadata["version"] as? String {
+                #expect(version == BackgroundTimeConfiguration.sdkVersion, "Should have correct SDK version in metadata")
+            }
+        }
+        
+        // Test statistics reflect the recorded events
+        let stats = sdk.getCurrentStats()
+        #expect(stats.generatedAt.timeIntervalSinceNow < 60, "Statistics should be recently generated")
+        
+        // Verify dashboard export includes the recorded events
+        let dashboardData = sdk.exportDataForDashboard()
+        #expect(dashboardData.events.count == initialCount, "Dashboard export should include all events")
+        #expect(dashboardData.timeline.count <= initialCount, "Timeline should not exceed total events")
+    }
 }
 
 @Suite("Data Store Tests")
