@@ -56,6 +56,41 @@ class NetworkManager {
         }
     }
     
+    /// Sync dashboard data to the specified endpoint
+    /// - Parameters:
+    ///   - data: Dashboard data to sync
+    ///   - endpoint: Target endpoint URL
+    /// - Throws: NetworkError if sync fails
+    func syncData(_ data: BackgroundTaskDashboardData, to endpoint: URL) async throws {
+        var request = URLRequest(url: endpoint.appendingPathComponent("/api/background-tasks/sync"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("BackgroundTime-SDK/1.0.0", forHTTPHeaderField: "User-Agent")
+        
+        do {
+            let jsonData = try JSONEncoder().encode(data)
+            request.httpBody = jsonData
+            
+            let (_, response) = try await session.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw NetworkError.invalidResponse
+            }
+            
+            guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
+                throw NetworkError.serverError(statusCode: httpResponse.statusCode)
+            }
+            
+            logger.info("Successfully synced dashboard data to \(endpoint.absoluteString)")
+            
+        } catch let error as NetworkError {
+            throw error
+        } catch {
+            logger.error("Failed to sync dashboard data: \(error.localizedDescription)")
+            throw NetworkError.uploadFailed(error)
+        }
+    }
+    
     func downloadDashboardConfig() async throws -> DashboardConfiguration {
         guard let endpoint = apiEndpoint else {
             throw NetworkError.noEndpointConfigured
@@ -84,24 +119,36 @@ class NetworkManager {
 // MARK: - Network Error Types
 
 enum NetworkError: Error, LocalizedError {
+    case noEndpoint
     case noEndpointConfigured
     case invalidResponse
+    case networkUnavailable
+    case authenticationFailed
     case serverError(statusCode: Int)
     case uploadFailed(Error)
     case downloadFailed(Error)
+    case unknownError(Error)
     
     var errorDescription: String? {
         switch self {
+        case .noEndpoint:
+            return "No API endpoint configured"
         case .noEndpointConfigured:
             return "No API endpoint configured for dashboard sync"
         case .invalidResponse:
             return "Invalid response from server"
+        case .networkUnavailable:
+            return "Network unavailable"
+        case .authenticationFailed:
+            return "Authentication failed"
         case .serverError(let statusCode):
             return "Server error with status code: \(statusCode)"
         case .uploadFailed(let error):
             return "Upload failed: \(error.localizedDescription)"
         case .downloadFailed(let error):
             return "Download failed: \(error.localizedDescription)"
+        case .unknownError(let error):
+            return "Unknown error: \(error.localizedDescription)"
         }
     }
 }
