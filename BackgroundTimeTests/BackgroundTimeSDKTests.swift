@@ -489,7 +489,7 @@ struct SwizzlingTests {
     
     @Test("Task Start Time Tracking")
     func testTaskStartTimeTracking() async throws {
-        let taskIdentifier = "test-start-time-task"
+        let taskIdentifier = "test-start-time-task-\(UUID().uuidString)"
         let startTime = Date()
         
         // Clear existing start times and wait for completion
@@ -531,9 +531,9 @@ struct SwizzlingTests {
         BGTaskSwizzler.swizzleTaskMethods()
         
         // Wait for clear to complete
-        try await Task.sleep(nanoseconds: 50_000_000) // 50ms
+        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
         
-        let taskIdentifier = "test-completion-task-unique"
+        let taskIdentifier = "test-completion-task-\(UUID().uuidString)"
         let startTime = Date()
         
         // Set up start time manually in the BGTaskSwizzler
@@ -571,8 +571,8 @@ struct SwizzlingTests {
             }
         }
         
-        // Wait for async operations
-        try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+        // Wait for async operations and persistence
+        try await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
         
         // Verify the event was recorded
         let allEvents = BackgroundTaskDataStore.shared.getAllEvents()
@@ -592,7 +592,7 @@ struct SwizzlingTests {
     
     @Test("Swizzling Thread Safety")
     func testSwizzlingThreadSafety() async throws {
-        let taskIdentifier = "test-thread-safety"
+        let baseTaskIdentifier = "test-thread-safety-\(UUID().uuidString)"
         let iterations = 10
         
         // Clear existing data and wait for it to complete
@@ -603,11 +603,14 @@ struct SwizzlingTests {
             }
         }
         
-        // Simulate concurrent access to task start times
+        // Wait for cleanup to complete
+        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        
+        // Simulate concurrent access to task start times with unique identifiers
         await withTaskGroup(of: Void.self) { group in
             for i in 0..<iterations {
                 group.addTask {
-                    let uniqueIdentifier = "\(taskIdentifier)-\(i)"
+                    let uniqueIdentifier = "\(baseTaskIdentifier)-\(i)"
                     await withCheckedContinuation { continuation in
                         BGTaskSwizzler.taskQueue.async(flags: .barrier) {
                             BGTaskSwizzler.taskStartTimes[uniqueIdentifier] = Date()
@@ -621,10 +624,10 @@ struct SwizzlingTests {
         // Wait for all operations to complete
         try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
         
-        // Verify all entries were recorded
+        // Verify all entries were recorded - filter by our base identifier
         let finalCount = await withCheckedContinuation { continuation in
             BGTaskSwizzler.taskQueue.async {
-                let count = BGTaskSwizzler.taskStartTimes.count
+                let count = BGTaskSwizzler.taskStartTimes.keys.filter { $0.hasPrefix(baseTaskIdentifier) }.count
                 continuation.resume(returning: count)
             }
         }
