@@ -117,7 +117,8 @@ extension BGTaskScheduler {
         
         // Try to submit the task and handle any errors
         do {
-            try self.bt_submit(taskRequest) // Call original method
+            // After method swizzling, calling bt_submit actually calls the original submit method
+            try self.bt_submit(taskRequest)
             BackgroundTaskDataStore.shared.recordEvent(event)
         } catch {
             // Record the failure
@@ -158,7 +159,9 @@ extension BGTaskScheduler {
         )
         
         BackgroundTaskDataStore.shared.recordEvent(event)
-        self.bt_cancel(taskRequestWithIdentifier: identifier) // Call original method
+        
+        // After method swizzling, calling bt_cancel actually calls the original cancel method
+        self.bt_cancel(taskRequestWithIdentifier: identifier)
     }
     
     @objc dynamic func bt_cancelAllTaskRequests() {
@@ -182,7 +185,9 @@ extension BGTaskScheduler {
         )
         
         BackgroundTaskDataStore.shared.recordEvent(event)
-        self.bt_cancelAllTaskRequests() // Call original method
+        
+        // After method swizzling, calling bt_cancelAllTaskRequests actually calls the original method
+        self.bt_cancelAllTaskRequests()
     }
     
     @objc dynamic func bt_register(forTaskWithIdentifier identifier: String, using queue: DispatchQueue?, launchHandler: @escaping (BGTask) -> Void) -> Bool {
@@ -218,6 +223,7 @@ extension BGTaskScheduler {
             launchHandler(task)
         }
         
+        // After method swizzling, calling bt_register actually calls the original register method
         return self.bt_register(forTaskWithIdentifier: identifier, using: queue, launchHandler: wrappedLaunchHandler)
     }
 }
@@ -225,7 +231,7 @@ extension BGTaskScheduler {
 // MARK: - Date Extension
 
 extension Date {
-    var iso8601String: String {
+    public var iso8601String: String {
         let formatter = ISO8601DateFormatter()
         return formatter.string(from: self)
     }

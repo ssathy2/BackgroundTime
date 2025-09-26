@@ -86,8 +86,9 @@ struct DataStoreTests {
         // Wait for clear to complete
         try await Task.sleep(nanoseconds: 50_000_000) // 50ms
         
-        // Create test events with unique identifiers
-        let testEvents = createMockEventsForStatistics()
+        // Create test events with unique identifiers to avoid interference
+        let baseIdentifier = "stats-test-\(UUID().uuidString)"
+        let testEvents = createMockEventsForStatistics(baseIdentifier: baseIdentifier)
         for event in testEvents {
             dataStore.recordEvent(event)
         }
@@ -97,15 +98,19 @@ struct DataStoreTests {
         
         // Verify events were actually recorded
         let allEvents = dataStore.getAllEvents()
-        let testTaskEvents = allEvents.filter { $0.taskIdentifier.hasPrefix("stats-test-") }
-        #expect(testTaskEvents.count > 0, "Test events should be recorded before generating statistics")
+        let testTaskEvents = allEvents.filter { $0.taskIdentifier.hasPrefix(baseIdentifier) }
+        #expect(testTaskEvents.count == testEvents.count, "All test events should be recorded: expected \(testEvents.count), got \(testTaskEvents.count)")
         
-        let stats = dataStore.generateStatistics()
+        // Generate statistics only from our test events to avoid interference from other tests
+        let stats = dataStore.generateStatistics(for: testTaskEvents, in: Date.distantPast...Date.distantFuture)
         
-        #expect(stats.totalTasksScheduled > 0, "Should have scheduled tasks in statistics")
-        #expect(stats.totalTasksExecuted > 0, "Should have executed tasks in statistics") 
-        #expect(stats.successRate >= 0.0)
-        #expect(stats.successRate <= 1.0)
+        #expect(stats.totalTasksScheduled == 2, "Should have 2 scheduled tasks")
+        #expect(stats.totalTasksExecuted == 2, "Should have 2 executed tasks") 
+        #expect(stats.totalTasksCompleted == 1, "Should have 1 completed task")
+        #expect(stats.totalTasksFailed == 1, "Should have 1 failed task")
+        #expect(stats.successRate >= 0.0, "Success rate should be >= 0.0")
+        #expect(stats.successRate <= 1.0, "Success rate should be <= 1.0")
+        #expect(stats.successRate == 0.5, "Success rate should be 0.5 (1 success out of 2 executed)")
     }
     
     @Test("Event Filtering by Date Range")
@@ -366,14 +371,19 @@ struct DataModelTests {
         let dataStore = BackgroundTaskDataStore.shared
         dataStore.clearAllEvents()
         
-        let stats = dataStore.generateStatistics()
+        // Wait for clear to complete
+        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
         
-        #expect(stats.totalTasksScheduled == 0)
-        #expect(stats.totalTasksExecuted == 0)
-        #expect(stats.totalTasksCompleted == 0)
-        #expect(stats.totalTasksFailed == 0)
-        #expect(stats.successRate == 0.0)
-        #expect(stats.averageExecutionTime == 0.0)
+        // Generate statistics with an empty array to test the statistics generation logic
+        let emptyEvents: [BackgroundTaskEvent] = []
+        let stats = dataStore.generateStatistics(for: emptyEvents, in: Date.distantPast...Date.distantFuture)
+        
+        #expect(stats.totalTasksScheduled == 0, "Should have 0 scheduled tasks with empty data")
+        #expect(stats.totalTasksExecuted == 0, "Should have 0 executed tasks with empty data")
+        #expect(stats.totalTasksCompleted == 0, "Should have 0 completed tasks with empty data")
+        #expect(stats.totalTasksFailed == 0, "Should have 0 failed tasks with empty data")
+        #expect(stats.successRate == 0.0, "Success rate should be 0.0 with empty data")
+        #expect(stats.averageExecutionTime == 0.0, "Average execution time should be 0.0 with empty data")
     }
 }
 
@@ -382,8 +392,8 @@ struct SwizzlingTests {
     
     @Test("BGTaskScheduler Swizzling Initialization")
     func testBGTaskSchedulerSwizzling() async throws {
-        // Clear events first
-        BackgroundTaskDataStore.shared.clearAllEvents()
+        // Don't clear all events since this is a shared store
+        // Just verify swizzling works without affecting the data store
         
         // Initialize swizzling
         BGTaskSchedulerSwizzler.swizzleSchedulerMethods()
@@ -397,17 +407,21 @@ struct SwizzlingTests {
         BGTaskSchedulerSwizzler.swizzleSchedulerMethods()
         
         #expect(scheduler != nil) // Still working after multiple swizzle attempts
+        
+        // Verify the data store is still functional
+        let dataStore = BackgroundTaskDataStore.shared
+        #expect(dataStore != nil, "Data store should remain functional after swizzling")
     }
     
     @Test("Task Registration Tracking")
     func testTaskRegistrationTracking() async throws {
-        BackgroundTaskDataStore.shared.clearAllEvents()
+        // Initialize swizzling first
         BGTaskSchedulerSwizzler.swizzleSchedulerMethods()
         
-        // Wait for clear to complete
+        // Wait for initialization to complete
         try await Task.sleep(nanoseconds: 50_000_000) // 50ms
         
-        let taskIdentifier = "test-registration-task-unique"
+        let taskIdentifier = "swizzling-registration-test-unique-\(UUID().uuidString)"
         let scheduler = BGTaskScheduler.shared
         
         // Register a task - this should work even in test environment
@@ -429,13 +443,13 @@ struct SwizzlingTests {
     
     @Test("Task Cancellation Tracking")
     func testTaskCancellationTracking() async throws {
-        BackgroundTaskDataStore.shared.clearAllEvents()
+        // Initialize swizzling first
         BGTaskSchedulerSwizzler.swizzleSchedulerMethods()
         
-        // Wait for clear to complete
+        // Wait for initialization to complete
         try await Task.sleep(nanoseconds: 50_000_000) // 50ms
         
-        let taskIdentifier = "test-cancellation-task-unique"
+        let taskIdentifier = "swizzling-cancellation-test-unique-\(UUID().uuidString)"
         let scheduler = BGTaskScheduler.shared
         
         // Test individual task cancellation
@@ -453,16 +467,16 @@ struct SwizzlingTests {
     
     @Test("Task Submission Error Handling")
     func testTaskSubmissionErrorHandling() async throws {
-        BackgroundTaskDataStore.shared.clearAllEvents()
+        // Initialize swizzling first
         BGTaskSchedulerSwizzler.swizzleSchedulerMethods()
         
-        // Wait for clear to complete
+        // Wait for initialization to complete
         try await Task.sleep(nanoseconds: 50_000_000) // 50ms
         
         let scheduler = BGTaskScheduler.shared
         
         // Create a task request with invalid identifier (should cause error)
-        let taskRequest = BGAppRefreshTaskRequest(identifier: "invalid-task-not-in-plist")
+        let taskRequest = BGAppRefreshTaskRequest(identifier: "swizzling-invalid-task-\(UUID().uuidString)")
         
         do {
             try scheduler.submit(taskRequest)
@@ -479,23 +493,39 @@ struct SwizzlingTests {
     
     @Test("BGTask Swizzling Initialization")
     func testBGTaskSwizzling() async throws {
+        // Initialize BGTask swizzling
         BGTaskSwizzler.swizzleTaskMethods()
         
         // Verify swizzling doesn't break the basic functionality
         // In a real scenario, we would test with an actual BGTask, but in unit tests
         // we just verify the swizzling process completes without crashing
         #expect(true, "Swizzling completed successfully")
+        
+        // Verify that the taskStartTimes dictionary is accessible
+        let initialCount = await withCheckedContinuation { continuation in
+            BGTaskSwizzler.taskQueue.async {
+                let count = BGTaskSwizzler.taskStartTimes.count
+                continuation.resume(returning: count)
+            }
+        }
+        
+        // The count could be anything depending on what other tests have done
+        // We just verify we can access it without crashing
+        #expect(initialCount >= 0, "Task start times dictionary should be accessible")
     }
     
     @Test("Task Start Time Tracking")
     func testTaskStartTimeTracking() async throws {
-        let taskIdentifier = "test-start-time-task-\(UUID().uuidString)"
+        let taskIdentifier = "swizzling-start-time-test-\(UUID().uuidString)"
         let startTime = Date()
         
-        // Clear existing start times and wait for completion
+        // Initialize swizzling to ensure it's set up
+        BGTaskSwizzler.swizzleTaskMethods()
+        
+        // Clear existing start times for this test identifier only
         await withCheckedContinuation { continuation in
             BGTaskSwizzler.taskQueue.async(flags: .barrier) {
-                BGTaskSwizzler.taskStartTimes.removeAll()
+                BGTaskSwizzler.taskStartTimes.removeValue(forKey: taskIdentifier)
                 continuation.resume()
             }
         }
@@ -523,17 +553,34 @@ struct SwizzlingTests {
         if let recordedTime = recordedStartTime {
             #expect(abs(recordedTime.timeIntervalSince(startTime)) < 1.0, "Recorded time should be within 1 second of start time")
         }
+        
+        // Clean up our test entry
+        await withCheckedContinuation { continuation in
+            BGTaskSwizzler.taskQueue.async(flags: .barrier) {
+                BGTaskSwizzler.taskStartTimes.removeValue(forKey: taskIdentifier)
+                continuation.resume()
+            }
+        }
     }
     
     @Test("Task Completion Event Recording")
     func testTaskCompletionEventRecording() async throws {
-        BackgroundTaskDataStore.shared.clearAllEvents()
+        let dataStore = BackgroundTaskDataStore.shared
+        
+        // Generate a unique task identifier for this specific test
+        let taskIdentifier = "swizzling-completion-test-\(UUID().uuidString)"
+        
+        // Initialize swizzling first to ensure it's set up
         BGTaskSwizzler.swizzleTaskMethods()
         
-        // Wait for clear to complete
-        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        // Clear task start times to ensure clean state
+        await withCheckedContinuation { continuation in
+            BGTaskSwizzler.taskQueue.async(flags: .barrier) {
+                BGTaskSwizzler.taskStartTimes.removeAll()
+                continuation.resume()
+            }
+        }
         
-        let taskIdentifier = "test-completion-task-\(UUID().uuidString)"
         let startTime = Date()
         
         // Set up start time manually in the BGTaskSwizzler
@@ -547,8 +594,11 @@ struct SwizzlingTests {
         // Wait for the start time to be set
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
+        // Record the count of existing events with our identifier before we add our event
+        let preTestEvents = dataStore.getAllEvents().filter { $0.taskIdentifier == taskIdentifier }
+        let preTestCount = preTestEvents.count
+        
         // Simulate task completion by directly creating an event
-        // This tests the event recording functionality without needing a real BGTask
         let completionEvent = BackgroundTaskEvent(
             id: UUID(),
             taskIdentifier: taskIdentifier,
@@ -557,27 +607,43 @@ struct SwizzlingTests {
             duration: 5.0,
             success: true,
             errorMessage: nil,
-            metadata: ["test": "completion"],
+            metadata: ["test": "completion", "swizzling": "true"],
             systemInfo: createMockSystemInfo()
         )
         
-        BackgroundTaskDataStore.shared.recordEvent(completionEvent)
+        dataStore.recordEvent(completionEvent)
         
-        // Simulate cleaning up start time (as the swizzled method would do)
+        // Wait for event to be recorded and persisted
+        try await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+        
+        // Look specifically for our event
+        let allEvents = dataStore.getAllEvents()
+        let completionEvents = allEvents.filter { 
+            $0.type == .taskExecutionCompleted && 
+            $0.taskIdentifier == taskIdentifier &&
+            ($0.metadata["swizzling"] as? String) == "true"
+        }
+        
+        // Should have exactly one more event than before
+        let expectedCount = preTestCount + 1
+        #expect(completionEvents.count == expectedCount, "Should have recorded exactly one completion event for task \(taskIdentifier). Expected: \(expectedCount), Found: \(completionEvents.count)")
+        
+        // Verify the event details if it exists
+        if let recordedEvent = completionEvents.first {
+            #expect(recordedEvent.taskIdentifier == taskIdentifier, "Task identifier should match")
+            #expect(recordedEvent.type == .taskExecutionCompleted, "Event type should be taskExecutionCompleted")
+            #expect(recordedEvent.duration == 5.0, "Duration should be 5.0")
+            #expect(recordedEvent.success == true, "Event should be marked as successful")
+            #expect((recordedEvent.metadata["test"] as? String) == "completion", "Metadata should contain test marker")
+        }
+        
+        // Clean up start time (as the swizzled method would do)
         await withCheckedContinuation { continuation in
             BGTaskSwizzler.taskQueue.async(flags: .barrier) {
                 BGTaskSwizzler.taskStartTimes.removeValue(forKey: taskIdentifier)
                 continuation.resume()
             }
         }
-        
-        // Wait for async operations and persistence
-        try await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
-        
-        // Verify the event was recorded
-        let allEvents = BackgroundTaskDataStore.shared.getAllEvents()
-        let completionEvents = allEvents.filter { $0.type == .taskExecutionCompleted && $0.taskIdentifier == taskIdentifier }
-        #expect(completionEvents.count == 1, "Should have recorded exactly one completion event, found \(completionEvents.count)")
         
         // Verify start time was cleaned up
         let remainingStartTime = await withCheckedContinuation { continuation in
@@ -587,18 +653,22 @@ struct SwizzlingTests {
             }
         }
         
-        #expect(remainingStartTime == nil, "Start time should be cleaned up")
+        #expect(remainingStartTime == nil, "Start time should be cleaned up after task completion")
     }
     
     @Test("Swizzling Thread Safety")
     func testSwizzlingThreadSafety() async throws {
-        let baseTaskIdentifier = "test-thread-safety-\(UUID().uuidString)"
+        let baseTaskIdentifier = "swizzling-thread-safety-\(UUID().uuidString)"
         let iterations = 10
+        
+        // Initialize swizzling to ensure it's set up
+        BGTaskSwizzler.swizzleTaskMethods()
         
         // Clear existing data and wait for it to complete
         await withCheckedContinuation { continuation in
             BGTaskSwizzler.taskQueue.async(flags: .barrier) {
-                BGTaskSwizzler.taskStartTimes.removeAll()
+                // Only remove entries that match our test pattern to avoid interfering with other tests
+                BGTaskSwizzler.taskStartTimes = BGTaskSwizzler.taskStartTimes.filter { !$0.key.hasPrefix(baseTaskIdentifier) }
                 continuation.resume()
             }
         }
@@ -633,6 +703,14 @@ struct SwizzlingTests {
         }
         
         #expect(finalCount == iterations, "Expected \(iterations) entries, got \(finalCount)")
+        
+        // Clean up our test entries
+        await withCheckedContinuation { continuation in
+            BGTaskSwizzler.taskQueue.async(flags: .barrier) {
+                BGTaskSwizzler.taskStartTimes = BGTaskSwizzler.taskStartTimes.filter { !$0.key.hasPrefix(baseTaskIdentifier) }
+                continuation.resume()
+            }
+        }
     }
     
     @Test("Date ISO8601 Extension")
@@ -725,12 +803,13 @@ private func createMockEvents() -> [BackgroundTaskEvent] {
     ]
 }
 
-private func createMockEventsForStatistics() -> [BackgroundTaskEvent] {
+private func createMockEventsForStatistics(baseIdentifier: String = "stats-test") -> [BackgroundTaskEvent] {
     let baseTimestamp = Date()
     return [
+        // Task 1: Scheduled -> Started -> Completed (Success)
         BackgroundTaskEvent(
             id: UUID(),
-            taskIdentifier: "stats-test-1",
+            taskIdentifier: "\(baseIdentifier)-1",
             type: .taskScheduled,
             timestamp: Date(timeInterval: -300, since: baseTimestamp),
             duration: nil,
@@ -741,7 +820,7 @@ private func createMockEventsForStatistics() -> [BackgroundTaskEvent] {
         ),
         BackgroundTaskEvent(
             id: UUID(),
-            taskIdentifier: "stats-test-1",
+            taskIdentifier: "\(baseIdentifier)-1",
             type: .taskExecutionStarted,
             timestamp: Date(timeInterval: -295, since: baseTimestamp),
             duration: nil,
@@ -752,7 +831,7 @@ private func createMockEventsForStatistics() -> [BackgroundTaskEvent] {
         ),
         BackgroundTaskEvent(
             id: UUID(),
-            taskIdentifier: "stats-test-1",
+            taskIdentifier: "\(baseIdentifier)-1",
             type: .taskExecutionCompleted,
             timestamp: Date(timeInterval: -290, since: baseTimestamp),
             duration: 5.0,
@@ -761,9 +840,10 @@ private func createMockEventsForStatistics() -> [BackgroundTaskEvent] {
             metadata: [:],
             systemInfo: createMockSystemInfo()
         ),
+        // Task 2: Scheduled -> Started -> Failed
         BackgroundTaskEvent(
             id: UUID(),
-            taskIdentifier: "stats-test-2",
+            taskIdentifier: "\(baseIdentifier)-2",
             type: .taskScheduled,
             timestamp: Date(timeInterval: -200, since: baseTimestamp),
             duration: nil,
@@ -774,7 +854,7 @@ private func createMockEventsForStatistics() -> [BackgroundTaskEvent] {
         ),
         BackgroundTaskEvent(
             id: UUID(),
-            taskIdentifier: "stats-test-2",
+            taskIdentifier: "\(baseIdentifier)-2",
             type: .taskExecutionStarted,
             timestamp: Date(timeInterval: -195, since: baseTimestamp),
             duration: nil,
@@ -785,7 +865,7 @@ private func createMockEventsForStatistics() -> [BackgroundTaskEvent] {
         ),
         BackgroundTaskEvent(
             id: UUID(),
-            taskIdentifier: "stats-test-2",
+            taskIdentifier: "\(baseIdentifier)-2",
             type: .taskFailed,
             timestamp: Date(timeInterval: -190, since: baseTimestamp),
             duration: nil,

@@ -123,7 +123,11 @@ extension BGTask {
             BGTaskSwizzler.taskStartTimes.removeValue(forKey: self.identifier)
         }
         
-        // Call original method
-        self.bt_setTaskCompleted(success: success)
+        // Call original method - after swizzling, bt_setTaskCompleted selector points to original implementation
+        let method = class_getInstanceMethod(BGTask.self, #selector(BGTask.bt_setTaskCompleted(success:)))!
+        let originalImp = method_getImplementation(method)
+        typealias SetTaskCompletedFunction = @convention(c) (BGTask, Selector, Bool) -> Void
+        let originalSetTaskCompleted = unsafeBitCast(originalImp, to: SetTaskCompletedFunction.self)
+        originalSetTaskCompleted(self, #selector(BGTask.bt_setTaskCompleted(success:)), success)
     }
 }
