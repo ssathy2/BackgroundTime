@@ -13,38 +13,6 @@ import BackgroundTasks
 
 // MARK: - Test Helpers
 
-/// Mock UserDefaults that doesn't persist data
-class MockUserDefaults: UserDefaults {
-    private var storage: [String: Any] = [:]
-    
-    override func set(_ value: Any?, forKey defaultName: String) {
-        storage[defaultName] = value
-    }
-    
-    override func object(forKey defaultName: String) -> Any? {
-        return storage[defaultName]
-    }
-    
-    override func data(forKey defaultName: String) -> Data? {
-        return storage[defaultName] as? Data
-    }
-    
-    override func removeObject(forKey defaultName: String) {
-        storage.removeValue(forKey: defaultName)
-    }
-    
-    override func synchronize() -> Bool {
-        return true
-    }
-}
-
-extension BackgroundTaskDataStore {
-    /// Create a test instance with isolated storage
-    static func createTestInstance() -> BackgroundTaskDataStore {
-        return BackgroundTaskDataStore(userDefaults: MockUserDefaults())
-    }
-}
-
 @Suite("BackgroundTime SDK Core Tests")
 struct BackgroundTimeSDKTests {
     
