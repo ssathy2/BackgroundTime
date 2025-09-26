@@ -17,12 +17,20 @@ class BackgroundTaskDataStore {
     private let eventStore: ThreadSafeDataStore<BackgroundTaskEvent>
     private let performanceMonitor = AccessPatternMonitor.shared
     
-    private let userDefaults = UserDefaults(suiteName: "BackgroundTime.DataStore")
+    private let userDefaults: UserDefaults?
     private let eventsKey = "BackgroundTime.StoredEvents"
     
     private init() {
-        // Initialize with default capacity
+        // Initialize with default capacity and default UserDefaults suite
         self.eventStore = ThreadSafeDataStore<BackgroundTaskEvent>(capacity: 1000)
+        self.userDefaults = UserDefaults(suiteName: "BackgroundTime.DataStore")
+        loadPersistedEvents()
+    }
+    
+    /// Create a data store instance with custom UserDefaults for testing
+    init(userDefaults: UserDefaults) {
+        self.eventStore = ThreadSafeDataStore<BackgroundTaskEvent>(capacity: 1000)
+        self.userDefaults = userDefaults
         loadPersistedEvents()
     }
     

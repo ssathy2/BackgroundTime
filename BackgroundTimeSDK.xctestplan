@@ -1,0 +1,24 @@
+{
+  "configurations" : [
+    {
+      "id" : "CDD7B5E2-6E8C-4F8A-9E8C-1234567890AB",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:BackgroundTime.xcodeproj",
+        "identifier" : "DE48B6A82E7E6128009A676E",
+        "name" : "BackgroundTimeTests"
+      }
+    }
+  ],
+  "version" : 1
+}

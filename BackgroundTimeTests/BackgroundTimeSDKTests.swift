@@ -11,6 +11,40 @@ import UIKit
 import BackgroundTasks
 @testable import BackgroundTime
 
+// MARK: - Test Helpers
+
+/// Mock UserDefaults that doesn't persist data
+class MockUserDefaults: UserDefaults {
+    private var storage: [String: Any] = [:]
+    
+    override func set(_ value: Any?, forKey defaultName: String) {
+        storage[defaultName] = value
+    }
+    
+    override func object(forKey defaultName: String) -> Any? {
+        return storage[defaultName]
+    }
+    
+    override func data(forKey defaultName: String) -> Data? {
+        return storage[defaultName] as? Data
+    }
+    
+    override func removeObject(forKey defaultName: String) {
+        storage.removeValue(forKey: defaultName)
+    }
+    
+    override func synchronize() -> Bool {
+        return true
+    }
+}
+
+extension BackgroundTaskDataStore {
+    /// Create a test instance with isolated storage
+    static func createTestInstance() -> BackgroundTaskDataStore {
+        return BackgroundTaskDataStore(userDefaults: MockUserDefaults())
+    }
+}
+
 @Suite("BackgroundTime SDK Core Tests")
 struct BackgroundTimeSDKTests {
     
@@ -47,11 +81,8 @@ struct DataStoreTests {
     
     @Test("Event Recording")
     func testEventRecording() async throws {
-        let dataStore = BackgroundTaskDataStore.shared
-        
-        // Clear existing events and wait for persistence
-        dataStore.clearAllEvents()
-        try await Task.sleep(nanoseconds: 50_000_000) // 50ms
+        // Use isolated test instance
+        let dataStore = BackgroundTaskDataStore.createTestInstance()
         
         let event = BackgroundTaskEvent(
             id: UUID(),
@@ -71,58 +102,45 @@ struct DataStoreTests {
         try await Task.sleep(nanoseconds: 50_000_000) // 50ms
         
         let allEvents = dataStore.getAllEvents()
-        // Filter out SDK events to focus on our test event
-        let testEvents = allEvents.filter { $0.taskIdentifier == "test-task-recording" }
-        #expect(testEvents.count == 1, "Should have exactly one test event, but found \(testEvents.count) events")
-        #expect(testEvents.first?.taskIdentifier == "test-task-recording")
-        #expect(testEvents.first?.type == .taskScheduled)
+        #expect(allEvents.count == 1, "Should have exactly one event")
+        #expect(allEvents.first?.taskIdentifier == "test-task-recording")
+        #expect(allEvents.first?.type == .taskScheduled)
     }
     
     @Test("Statistics Generation")
     func testStatisticsGeneration() async throws {
-        let dataStore = BackgroundTaskDataStore.shared
-        dataStore.clearAllEvents()
+        // Use isolated test instance
+        let dataStore = BackgroundTaskDataStore.createTestInstance()
         
-        // Wait for clear to complete
-        try await Task.sleep(nanoseconds: 50_000_000) // 50ms
-        
-        // Create test events with unique identifiers to avoid interference
+        // Create test events with unique identifiers
         let baseIdentifier = "stats-test-\(UUID().uuidString)"
         let testEvents = createMockEventsForStatistics(baseIdentifier: baseIdentifier)
         for event in testEvents {
             dataStore.recordEvent(event)
         }
         
-        // Delay to ensure events are recorded and persisted
+        // Delay to ensure events are recorded
         try await Task.sleep(nanoseconds: 100_000_000) // 100ms
         
-        // Verify events were actually recorded
+        // Verify events were recorded
         let allEvents = dataStore.getAllEvents()
-        let testTaskEvents = allEvents.filter { $0.taskIdentifier.hasPrefix(baseIdentifier) }
-        #expect(testTaskEvents.count == testEvents.count, "All test events should be recorded: expected \(testEvents.count), got \(testTaskEvents.count)")
+        #expect(allEvents.count == testEvents.count, "All test events should be recorded: expected \(testEvents.count), got \(allEvents.count)")
         
-        // Generate statistics only from our test events to avoid interference from other tests
-        let stats = dataStore.generateStatistics(for: testTaskEvents, in: Date.distantPast...Date.distantFuture)
+        let stats = dataStore.generateStatistics()
         
         #expect(stats.totalTasksScheduled == 2, "Should have 2 scheduled tasks")
-        #expect(stats.totalTasksExecuted == 2, "Should have 2 executed tasks") 
+        #expect(stats.totalTasksExecuted == 2, "Should have 2 executed tasks")
         #expect(stats.totalTasksCompleted == 1, "Should have 1 completed task")
         #expect(stats.totalTasksFailed == 1, "Should have 1 failed task")
-        #expect(stats.successRate >= 0.0, "Success rate should be >= 0.0")
-        #expect(stats.successRate <= 1.0, "Success rate should be <= 1.0")
         #expect(stats.successRate == 0.5, "Success rate should be 0.5 (1 success out of 2 executed)")
     }
     
     @Test("Event Filtering by Date Range")
     func testEventFilteringByDateRange() async throws {
-        let dataStore = BackgroundTaskDataStore.shared
-        dataStore.clearAllEvents()
-        
-        // Wait for clear to complete
-        try await Task.sleep(nanoseconds: 50_000_000) // 50ms
+        // Use isolated test instance
+        let dataStore = BackgroundTaskDataStore.createTestInstance()
         
         let now = Date()
-        let oneHourAgo = Date(timeIntervalSinceNow: -3600)
         let twoHoursAgo = Date(timeIntervalSinceNow: -7200)
         
         // Create events at different times with unique identifiers
@@ -169,11 +187,8 @@ struct DataStoreTests {
     
     @Test("Task Performance Metrics")
     func testTaskPerformanceMetrics() async throws {
-        let dataStore = BackgroundTaskDataStore.shared
-        dataStore.clearAllEvents()
-        
-        // Wait for clear to complete
-        try await Task.sleep(nanoseconds: 50_000_000) // 50ms
+        // Use isolated test instance
+        let dataStore = BackgroundTaskDataStore.createTestInstance()
         
         let taskIdentifier = "performance-test-task-unique"
         let baseTimestamp = Date()
@@ -219,13 +234,12 @@ struct DataStoreTests {
         dataStore.recordEvent(executedEvent)
         dataStore.recordEvent(completedEvent)
         
-        // Delay to ensure events are recorded and persisted
-        try await Task.sleep(nanoseconds: 150_000_000) // 150ms
+        // Delay to ensure events are recorded
+        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
         
         // Verify events were recorded
         let allEvents = dataStore.getAllEvents()
-        let taskEvents = allEvents.filter { $0.taskIdentifier == taskIdentifier }
-        #expect(taskEvents.count == 3, "Should have recorded 3 events for the task, found \(taskEvents.count)")
+        #expect(allEvents.count == 3, "Should have recorded 3 events for the task, found \(allEvents.count)")
         
         let metrics = dataStore.getTaskPerformanceMetrics(for: taskIdentifier)
         
@@ -368,11 +382,8 @@ struct DataModelTests {
     
     @Test("Statistics Generation with Empty Data")
     func testStatisticsWithEmptyData() async throws {
-        let dataStore = BackgroundTaskDataStore.shared
-        dataStore.clearAllEvents()
-        
-        // Wait for clear to complete
-        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        // Use isolated test instance
+        let dataStore = BackgroundTaskDataStore.createTestInstance()
         
         // Generate statistics with an empty array to test the statistics generation logic
         let emptyEvents: [BackgroundTaskEvent] = []
@@ -409,7 +420,7 @@ struct SwizzlingTests {
         #expect(scheduler != nil) // Still working after multiple swizzle attempts
         
         // Verify the data store is still functional
-        let dataStore = BackgroundTaskDataStore.shared
+        let dataStore = BackgroundTaskDataStore.createTestInstance()
         #expect(dataStore != nil, "Data store should remain functional after swizzling")
     }
     
@@ -425,7 +436,7 @@ struct SwizzlingTests {
         let scheduler = BGTaskScheduler.shared
         
         // Register a task - this should work even in test environment
-        let registered = scheduler.register(
+        let _ = scheduler.register(
             forTaskWithIdentifier: taskIdentifier,
             using: nil
         ) { task in
@@ -565,7 +576,8 @@ struct SwizzlingTests {
     
     @Test("Task Completion Event Recording")
     func testTaskCompletionEventRecording() async throws {
-        let dataStore = BackgroundTaskDataStore.shared
+        // Use isolated test instance
+        let dataStore = BackgroundTaskDataStore.createTestInstance()
         
         // Generate a unique task identifier for this specific test
         let taskIdentifier = "swizzling-completion-test-\(UUID().uuidString)"

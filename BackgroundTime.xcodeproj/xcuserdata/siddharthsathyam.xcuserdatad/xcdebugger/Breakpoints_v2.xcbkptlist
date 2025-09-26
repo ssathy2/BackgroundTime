@@ -18,36 +18,6 @@
             endingLineNumber = "54"
             landmarkName = "toArray()"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "D7BC0A43-D9FA-4AE3-A7C4-532E89CE640B - 797747192c0ea3c6"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "BackgroundTime.ThreadSafeDataStore.toArray() -&gt; Swift.Array&lt;&#x3c4;_0_0&gt;"
-                  moduleName = "BackgroundTime"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/siddharthsathyam/Documents/xcode/BackgroundTime/BackgroundTime/ThreadSafeDataStore.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "54"
-                  endingLineNumber = "54">
-               </Location>
-               <Location
-                  uuid = "D7BC0A43-D9FA-4AE3-A7C4-532E89CE640B - 2a4274ef317fe35b"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "closure #1 () -&gt; Swift.Array&lt;&#x3c4;_0_0&gt; in BackgroundTime.ThreadSafeDataStore.toArray() -&gt; Swift.Array&lt;&#x3c4;_0_0&gt;"
-                  moduleName = "BackgroundTime"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/siddharthsathyam/Documents/xcode/BackgroundTime/BackgroundTime/ThreadSafeDataStore.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "54"
-                  endingLineNumber = "54">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>
