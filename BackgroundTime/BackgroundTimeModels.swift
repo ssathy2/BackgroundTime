@@ -299,3 +299,35 @@ public enum TaskPriority: String, Codable, CaseIterable {
         }
     }
 }
+
+// MARK: - Time Range for filtering
+public enum TimeRange: Codable, CaseIterable {
+    case last1Hour
+    case last6Hours 
+    case last24Hours
+    case last7Days
+    case last30Days
+    case all
+    
+    public var timeInterval: TimeInterval {
+        switch self {
+        case .last1Hour: return 3600 // 1 hour
+        case .last6Hours: return 6 * 3600 // 6 hours
+        case .last24Hours: return 24 * 3600 // 24 hours 
+        case .last7Days: return 7 * 24 * 3600 // 7 days
+        case .last30Days: return 30 * 24 * 3600 // 30 days
+        case .all: return TimeInterval.greatestFiniteMagnitude
+        }
+    }
+    
+    public var displayName: String {
+        switch self {
+        case .last1Hour: return "Last Hour"
+        case .last6Hours: return "Last 6 Hours"
+        case .last24Hours: return "Last 24 Hours"
+        case .last7Days: return "Last 7 Days" 
+        case .last30Days: return "Last 30 Days"
+        case .all: return "All Time"
+        }
+    }
+}

@@ -8,6 +8,26 @@
 import Foundation
 import os.log
 
+// MARK: - Statistics
+
+public struct BufferStatistics: Codable {
+    public let capacity: Int
+    public let currentCount: Int
+    public let availableSpace: Int
+    public let utilizationPercentage: Double
+    public let isEmpty: Bool
+    public let isFull: Bool
+    
+    public init(capacity: Int, currentCount: Int, availableSpace: Int, utilizationPercentage: Double, isEmpty: Bool, isFull: Bool) {
+        self.capacity = capacity
+        self.currentCount = currentCount
+        self.availableSpace = availableSpace
+        self.utilizationPercentage = utilizationPercentage
+        self.isEmpty = isEmpty
+        self.isFull = isFull
+    }
+}
+
 // MARK: - Thread-Safe Circular Buffer
 
 public class CircularBuffer<T: Codable> {
@@ -263,8 +283,6 @@ public class CircularBuffer<T: Codable> {
         }
     }
     
-    // MARK: - Statistics
-    
     public func getStatistics() -> BufferStatistics {
         lock.lock()
         defer { lock.unlock() }
@@ -272,10 +290,10 @@ public class CircularBuffer<T: Codable> {
         return BufferStatistics(
             capacity: capacity,
             currentCount: count,
+            availableSpace: capacity - count,
             utilizationPercentage: Double(count) / Double(capacity) * 100,
             isEmpty: count == 0,
-            isFull: count == capacity,
-            availableSpace: capacity - count
+            isFull: count == capacity
         )
     }
     
@@ -296,28 +314,6 @@ public class CircularBuffer<T: Codable> {
         }
         
         return result
-    }
-}
-
-// MARK: - Buffer Statistics
-
-public struct BufferStatistics: Codable {
-    public let capacity: Int
-    public let currentCount: Int
-    public let utilizationPercentage: Double
-    public let isEmpty: Bool
-    public let isFull: Bool
-    public let availableSpace: Int
-    
-    public var description: String {
-        return """
-        Buffer Statistics:
-        - Capacity: \(capacity)
-        - Current Count: \(currentCount)
-        - Utilization: \(String(format: "%.1f", utilizationPercentage))%
-        - Available Space: \(availableSpace)
-        - Status: \(isEmpty ? "Empty" : (isFull ? "Full" : "Partially Filled"))
-        """
     }
 }
 

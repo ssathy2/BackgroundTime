@@ -44,31 +44,6 @@ enum DashboardTab: CaseIterable {
     }
 }
 
-enum TimeRange: String, CaseIterable {
-    case last1Hour = "1h"
-    case last6Hours = "6h"
-    case last24Hours = "24h"
-    case last7Days = "7d"
-    
-    var displayName: String {
-        switch self {
-        case .last1Hour: return "1 Hour"
-        case .last6Hours: return "6 Hours"
-        case .last24Hours: return "24 Hours"
-        case .last7Days: return "7 Days"
-        }
-    }
-    
-    var timeInterval: TimeInterval {
-        switch self {
-        case .last1Hour: return 3600
-        case .last6Hours: return 21600
-        case .last24Hours: return 86400
-        case .last7Days: return 604800
-        }
-    }
-}
-
 // MARK: - iOS Version Support Helpers
 
 extension UIDevice {
