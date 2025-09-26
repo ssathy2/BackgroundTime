@@ -177,12 +177,28 @@ public struct BackgroundTaskStatistics: Codable {
 }
 
 public struct TimelineDataPoint: Codable, Identifiable {
-    public let id = UUID()
+    public let id: UUID
     public let timestamp: Date
     public let eventType: BackgroundTaskEventType
     public let taskIdentifier: String
     public let duration: TimeInterval?
     public let success: Bool
+    
+    public init(
+        id: UUID = UUID(),
+        timestamp: Date,
+        eventType: BackgroundTaskEventType,
+        taskIdentifier: String,
+        duration: TimeInterval?,
+        success: Bool
+    ) {
+        self.id = id
+        self.timestamp = timestamp
+        self.eventType = eventType
+        self.taskIdentifier = taskIdentifier
+        self.duration = duration
+        self.success = success
+    }
 }
 
 public struct BackgroundTaskDashboardData: Codable {
@@ -190,14 +206,28 @@ public struct BackgroundTaskDashboardData: Codable {
     public let events: [BackgroundTaskEvent]
     public let timeline: [TimelineDataPoint]
     public let systemInfo: SystemInfo
-    public let generatedAt: Date = Date()
+    public let generatedAt: Date
+    
+    public init(
+        statistics: BackgroundTaskStatistics,
+        events: [BackgroundTaskEvent],
+        timeline: [TimelineDataPoint],
+        systemInfo: SystemInfo,
+        generatedAt: Date = Date()
+    ) {
+        self.statistics = statistics
+        self.events = events
+        self.timeline = timeline
+        self.systemInfo = systemInfo
+        self.generatedAt = generatedAt
+    }
 }
 
 // MARK: - Continuous Background Tasks (iOS 26.0+)
 
 @available(iOS 26.0, *)
 public struct ContinuousTaskInfo: Codable, Identifiable {
-    public let id = UUID()
+    public let id: UUID
     public let taskIdentifier: String
     public let startTime: Date
     public let currentStatus: ContinuousTaskStatus
@@ -209,6 +239,7 @@ public struct ContinuousTaskInfo: Codable, Identifiable {
     public let priority: TaskPriority
     
     public init(
+        id: UUID = UUID(),
         taskIdentifier: String,
         startTime: Date,
         currentStatus: ContinuousTaskStatus,
@@ -219,6 +250,7 @@ public struct ContinuousTaskInfo: Codable, Identifiable {
         expectedDuration: TimeInterval? = nil,
         priority: TaskPriority = .medium
     ) {
+        self.id = id
         self.taskIdentifier = taskIdentifier
         self.startTime = startTime
         self.currentStatus = currentStatus
@@ -256,7 +288,7 @@ public enum ContinuousTaskStatus: String, Codable, CaseIterable {
 
 @available(iOS 26.0, *)
 public struct ContinuousTaskProgress: Codable, Identifiable {
-    public let id = UUID()
+    public let id: UUID
     public let timestamp: Date
     public let completedUnitCount: Int64
     public let totalUnitCount: Int64
@@ -269,12 +301,14 @@ public struct ContinuousTaskProgress: Codable, Identifiable {
     }
     
     public init(
+        id: UUID = UUID(),
         timestamp: Date = Date(),
         completedUnitCount: Int64,
         totalUnitCount: Int64,
         localizedDescription: String? = nil,
         userInfo: [String: String] = [:]
     ) {
+        self.id = id
         self.timestamp = timestamp
         self.completedUnitCount = completedUnitCount
         self.totalUnitCount = totalUnitCount

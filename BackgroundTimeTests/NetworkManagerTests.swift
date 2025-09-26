@@ -18,6 +18,9 @@ struct NetworkManagerTests {
     func testNetworkManagerConfiguration() async throws {
         let networkManager = NetworkManager.shared
         
+        // Reset singleton state before test to avoid interference
+        networkManager.configure(apiEndpoint: nil)
+        
         // Test configuration with nil endpoint
         networkManager.configure(apiEndpoint: nil)
         
@@ -47,12 +50,22 @@ struct NetworkManagerTests {
     @Test("NetworkManager upload dashboard data error scenarios")
     func testNetworkManagerUploadErrors() async throws {
         let networkManager = NetworkManager.shared
+        
+        // Reset singleton state before test to avoid interference
+        networkManager.configure(apiEndpoint: nil)
         let dashboardData = BackgroundTaskDashboardData(
             statistics: createMockStatistics(),
             events: createMockEvents(),
             timeline: createMockTimelineData(),
             systemInfo: createMockSystemInfo()
         )
+        
+        // Verify the dashboard data can be JSON encoded (this was likely causing the failure)
+        do {
+            let _ = try JSONEncoder().encode(dashboardData)
+        } catch {
+            #expect(Bool(false), "Dashboard data should be JSON encodable: \(error)")
+        }
         
         // Test upload with no endpoint configured
         networkManager.configure(apiEndpoint: nil)
@@ -78,11 +91,17 @@ struct NetworkManagerTests {
             // Expected to fail due to invalid endpoint
             #expect(error != nil, "Should handle network errors gracefully")
         }
+        
+        // Clean up singleton state
+        networkManager.configure(apiEndpoint: nil)
     }
     
     @Test("NetworkManager download dashboard config error scenarios")
     func testNetworkManagerDownloadErrors() async throws {
         let networkManager = NetworkManager.shared
+        
+        // Reset singleton state before test to avoid interference
+        networkManager.configure(apiEndpoint: nil)
         
         // Test download with no endpoint configured
         networkManager.configure(apiEndpoint: nil)
@@ -193,6 +212,9 @@ struct NetworkManagerTests {
     
     @Test("NetworkManager singleton behavior")
     func testNetworkManagerSingleton() async throws {
+        // Reset singleton state before test to avoid interference
+        NetworkManager.shared.configure(apiEndpoint: nil)
+        
         let instance1 = NetworkManager.shared
         let instance2 = NetworkManager.shared
         
