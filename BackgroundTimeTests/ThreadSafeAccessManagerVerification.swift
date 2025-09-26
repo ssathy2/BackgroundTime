@@ -30,8 +30,8 @@ struct ThreadSafeAccessManagerVerificationTests {
         
         // The current PerformanceReport doesn't support Codable, so we'll test basic functionality
         let slowOpStats = report.operationStats["slow_operation"]!
-        #expect(slowOpStats.averageDuration == 0.2)
-        #expect(slowOpStats.operationCount == 1)
+        #expect(slowOpStats.averageTime == 0.2)
+        #expect(slowOpStats.totalCalls == 1)
     }
     
     @Test("DataSnapshot Codable conformance")
@@ -150,8 +150,8 @@ struct ThreadSafeAccessManagerVerificationTests {
         let slowOpStats = report.operationStats["slow_op"]
         #expect(slowOpStats != nil)
         if let slowOpStats = slowOpStats {
-            #expect(slowOpStats.averageDuration == 0.15)
-            #expect(slowOpStats.operationCount >= 1)
+            #expect(slowOpStats.averageTime == 0.15)
+            #expect(slowOpStats.totalCalls >= 1)
         }
     }
 }

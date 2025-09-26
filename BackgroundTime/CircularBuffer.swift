@@ -8,26 +8,6 @@
 import Foundation
 import os.log
 
-// MARK: - Statistics
-
-public struct BufferStatistics: Codable {
-    public let capacity: Int
-    public let currentCount: Int
-    public let availableSpace: Int
-    public let utilizationPercentage: Double
-    public let isEmpty: Bool
-    public let isFull: Bool
-    
-    public init(capacity: Int, currentCount: Int, availableSpace: Int, utilizationPercentage: Double, isEmpty: Bool, isFull: Bool) {
-        self.capacity = capacity
-        self.currentCount = currentCount
-        self.availableSpace = availableSpace
-        self.utilizationPercentage = utilizationPercentage
-        self.isEmpty = isEmpty
-        self.isFull = isFull
-    }
-}
-
 // MARK: - Thread-Safe Circular Buffer
 
 public class CircularBuffer<T: Codable> {

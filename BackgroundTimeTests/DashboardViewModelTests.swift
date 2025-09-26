@@ -24,6 +24,35 @@ struct DashboardViewModelTests {
         return (viewModel, mockDataStore)
     }
     
+    // MARK: - Debug Tests
+    
+    @Test("Debug Data Store")
+    func testDataStore() async throws {
+        let mockDataStore = BackgroundTaskDataStore.createMockInstance()
+        
+        // Add a simple test event
+        let testEvent = createTestEvent(taskId: "debug-task", type: .taskExecutionCompleted)
+        mockDataStore.recordEvent(testEvent)
+        
+        // Check if it's stored
+        let allEvents = mockDataStore.getAllEvents()
+        #expect(allEvents.count == 1, "Should have 1 event in data store")
+        
+        // Check date range filtering
+        let now = Date()
+        let oneHourAgo = now.addingTimeInterval(-3600)
+        let eventsInRange = mockDataStore.getEventsInDateRange(from: oneHourAgo, to: now)
+        #expect(eventsInRange.count == 1, "Should have 1 event in date range")
+        
+        // Test ViewModel with this data store
+        let viewModel = DashboardViewModel(dataStore: mockDataStore)
+        await viewModel.loadData(for: .last24Hours)
+        
+        #expect(viewModel.events.count == 1, "ViewModel should have 1 event")
+        #expect(viewModel.statistics != nil, "Should have statistics")
+        #expect(viewModel.timelineData.count == 1, "Should have 1 timeline item")
+    }
+    
     // MARK: - Initialization Tests
     
     @Test("DashboardViewModel Initialization")
@@ -205,9 +234,6 @@ struct DashboardViewModelTests {
         // Refresh data
         await viewModel.refresh()
         
-        // Wait for refresh to complete
-        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-        
         #expect(viewModel.events.count == initialEventCount + 1, "Should reflect new events after refresh")
         #expect(viewModel.selectedTimeRange == .last6Hours, "Should maintain selected time range")
     }
@@ -231,9 +257,6 @@ struct DashboardViewModelTests {
         
         // Clear all data
         await viewModel.clearAllData()
-        
-        // Wait a moment for the clear and reload to complete
-        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         #expect(viewModel.events.isEmpty, "Should have no events after clearing")
     }
@@ -360,9 +383,6 @@ struct DashboardViewModelTests {
         
         // Wait for auto-refresh (timer is set to 30 seconds, but we'll simulate it)
         await viewModel.refresh()
-        
-        // Wait for refresh to complete
-        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         #expect(viewModel.events.count == initialEventCount + 1, "Should auto-refresh and pick up new events")
     }

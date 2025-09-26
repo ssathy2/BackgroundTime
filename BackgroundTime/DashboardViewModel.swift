@@ -34,7 +34,7 @@ class DashboardViewModel: ObservableObject {
         Timer.publish(every: 30, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
-                Task { [weak self] in
+                Task {
                     await self?.refresh()
                 }
             }
@@ -52,52 +52,41 @@ class DashboardViewModel: ObservableObject {
         error = nil
         
         do {
-            // Perform data operations on a background actor to avoid blocking the main thread
-            let result = await Task.detached { [dataStore] in
-                let endDate = Date()
-                let startDate = Date(timeIntervalSinceNow: -timeRange.timeInterval)
-                
-                // Load filtered events
-                let filteredEvents = dataStore.getEventsInDateRange(from: startDate, to: endDate)
-                
-                // Generate statistics based on filtered events
-                let stats = dataStore.generateStatistics(for: filteredEvents, in: startDate...endDate)
-                
-                // Generate timeline data
-                let timeline = filteredEvents.map { event in
-                    TimelineDataPoint(
-                        timestamp: event.timestamp,
-                        eventType: event.type,
-                        taskIdentifier: event.taskIdentifier,
-                        duration: event.duration,
-                        success: event.success
-                    )
-                }.sorted(by: { $0.timestamp > $1.timestamp })
-                
-                // Generate task metrics for filtered events
-                let uniqueTaskIdentifiers = Set(filteredEvents.map { $0.taskIdentifier })
-                let metrics = uniqueTaskIdentifiers.compactMap { identifier in
-                    dataStore.getTaskPerformanceMetrics(for: identifier, in: startDate...endDate)
-                }.sorted(by: { $0.taskIdentifier < $1.taskIdentifier })
-                
-                return (
-                    statistics: stats,
-                    events: filteredEvents.sorted(by: { $0.timestamp > $1.timestamp }),
-                    timeline: timeline,
-                    metrics: metrics,
-                    filteredEvents: filteredEvents
-                )
-            }.value
+            let endDate = Date()
+            let startDate = Date(timeIntervalSinceNow: -timeRange.timeInterval)
             
-            // Update UI on main actor
-            self.statistics = result.statistics
-            self.events = result.events
-            self.timelineData = result.timeline
-            self.taskMetrics = result.metrics
+            // Load filtered events
+            let filteredEvents = dataStore.getEventsInDateRange(from: startDate, to: endDate)
+            
+            // Generate statistics based on filtered events
+            let stats = dataStore.generateStatistics(for: filteredEvents, in: startDate...endDate)
+            
+            // Generate timeline data
+            let timeline = filteredEvents.map { event in
+                TimelineDataPoint(
+                    timestamp: event.timestamp,
+                    eventType: event.type,
+                    taskIdentifier: event.taskIdentifier,
+                    duration: event.duration,
+                    success: event.success
+                )
+            }.sorted(by: { $0.timestamp > $1.timestamp })
+            
+            // Generate task metrics for filtered events
+            let uniqueTaskIdentifiers = Set(filteredEvents.map { $0.taskIdentifier })
+            let metrics = uniqueTaskIdentifiers.compactMap { identifier in
+                dataStore.getTaskPerformanceMetrics(for: identifier, in: startDate...endDate)
+            }.sorted(by: { $0.taskIdentifier < $1.taskIdentifier })
+            
+            // Update UI (already on main actor)
+            self.statistics = stats
+            self.events = filteredEvents.sorted(by: { $0.timestamp > $1.timestamp })
+            self.timelineData = timeline
+            self.taskMetrics = metrics
             
             // Process continuous tasks data for iOS 26+
             if #available(iOS 26.0, *) {
-                self.processContinuousTasksData(from: result.filteredEvents)
+                self.processContinuousTasksData(from: filteredEvents)
             }
             
             self.isLoading = false
@@ -125,15 +114,10 @@ class DashboardViewModel: ObservableObject {
         do {
             try await BackgroundTime.shared.syncWithDashboard()
         } catch {
-            self.error = "Sync failed: \(error.localizedDescription)"
+            await MainActor.run {
+                self.error = "Sync failed: \(error.localizedDescription)"
+            }
         }
-    }
-    
-    // MARK: - Testing Support
-    
-    /// For testing purposes only - simulates an error state
-    func simulateError(_ message: String) async {
-        self.error = message
     }
     
     // MARK: - Continuous Tasks Support (iOS 26.0+)
