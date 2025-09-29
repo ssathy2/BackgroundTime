@@ -72,6 +72,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		DE3009FC2E8A4F0D00153FD4 /* Exceptions for "BackgroundTimeExample" folder in "BackgroundTimeExample" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = DE48B6BB2E7E6148009A676E /* BackgroundTimeExample */;
+		};
 		DE9C66942E7F86D6004FC608 /* Exceptions for "BackgroundTime" folder in "BackgroundTime" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -98,6 +105,9 @@
 		};
 		DE48B6BD2E7E6148009A676E /* BackgroundTimeExample */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				DE3009FC2E8A4F0D00153FD4 /* Exceptions for "BackgroundTimeExample" folder in "BackgroundTimeExample" target */,
+			);
 			path = BackgroundTimeExample;
 			sourceTree = "<group>";
 		};
@@ -746,6 +756,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BackgroundTimeExample/Info.plist;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -790,6 +801,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BackgroundTimeExample/Info.plist;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

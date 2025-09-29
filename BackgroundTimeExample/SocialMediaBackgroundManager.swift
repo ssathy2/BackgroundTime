@@ -25,6 +25,7 @@ class SocialMediaBackgroundManager: ObservableObject {
     
     init() {
         setupModelContainer()
+        registerBackgroundTaskHandlers()
     }
     
     private func setupModelContainer() {
@@ -39,6 +40,43 @@ class SocialMediaBackgroundManager: ObservableObject {
         } catch {
             logger.error("Failed to create ModelContainer: \(error)")
         }
+    }
+    
+    private func registerBackgroundTaskHandlers() {
+        // Register handler for social feed refresh
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: "refresh-social-feed", using: nil) { task in
+            guard let appRefreshTask = task as? BGAppRefreshTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            Task { @MainActor in
+                self.handleAppRefreshTask(appRefreshTask)
+            }
+        }
+        
+        // Register handler for media download processing
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: "download-media", using: nil) { task in
+            guard let processingTask = task as? BGProcessingTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            Task { @MainActor in
+                self.handleProcessingTask(processingTask)
+            }
+        }
+        
+        // Register handler for chat message sync
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: "sync-chat-messages", using: nil) { task in
+            guard let appRefreshTask = task as? BGAppRefreshTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            Task { @MainActor in
+                self.handleChatSyncTask(appRefreshTask)
+            }
+        }
+        
+        logger.info("Background task handlers registered successfully")
     }
     
     // MARK: - Background Task Handlers

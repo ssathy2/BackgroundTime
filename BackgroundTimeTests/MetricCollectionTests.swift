@@ -204,7 +204,7 @@ struct MetricIntegrationTests {
     @Test("Result-based Task Execution")
     func testResultBasedExecution() async throws {
         let testPrefix = "result_test_\(UUID().uuidString.prefix(8))_"
-        let tracker = BackgroundTaskTracker.shared
+        let tracker = await BackgroundTaskTracker.shared
         let taskId = "\(testPrefix)task"
         
         // Clean up first
@@ -373,7 +373,7 @@ struct MetricPerformanceTests {
         // Test aggregation performance
         let startTime = CFAbsoluteTimeGetCurrent()
         
-        let aggregationService = MetricAggregationService.shared
+        let aggregationService = await MetricAggregationService.shared
         let report = await aggregationService.generateDailyReport(for: baseDate)
         
         let aggregationDuration = CFAbsoluteTimeGetCurrent() - startTime

@@ -26,7 +26,6 @@ struct BackgroundTimeExampleApp: App {
     
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
             SocialMediaPost.self,
             ChatMessage.self
         ])

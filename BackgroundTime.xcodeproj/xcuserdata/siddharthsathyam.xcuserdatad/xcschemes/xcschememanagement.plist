@@ -12,7 +12,7 @@
 		<key>BackgroundTimeExample.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
-			<integer>1</integer>
+			<integer>3</integer>
 		</dict>
 		<key>BackgroundTimeExampleTests.xcscheme_^#shared#^_</key>
 		<dict>
@@ -38,6 +38,11 @@
 			<true/>
 		</dict>
 		<key>DE48B6BB2E7E6148009A676E</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>DE48B6C92E7E614A009A676E</key>
 		<dict>
 			<key>primary</key>
 			<true/>
