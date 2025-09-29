@@ -117,7 +117,7 @@ extension BGTaskScheduler {
         
         // Try to submit the task and handle any errors
         do {
-            // After method swizzling, calling bt_submit actually calls the original submit method
+            // After method swizzling, bt_submit is now the original submit method
             try self.bt_submit(taskRequest)
             BackgroundTaskDataStore.shared.recordEvent(event)
         } catch {
@@ -160,7 +160,7 @@ extension BGTaskScheduler {
         
         BackgroundTaskDataStore.shared.recordEvent(event)
         
-        // After method swizzling, calling bt_cancel actually calls the original cancel method
+        // After method swizzling, bt_cancel is now the original cancel method
         self.bt_cancel(taskRequestWithIdentifier: identifier)
     }
     
@@ -186,7 +186,7 @@ extension BGTaskScheduler {
         
         BackgroundTaskDataStore.shared.recordEvent(event)
         
-        // After method swizzling, calling bt_cancelAllTaskRequests actually calls the original method
+        // After method swizzling, bt_cancelAllTaskRequests is now the original method
         self.bt_cancelAllTaskRequests()
     }
     
@@ -223,7 +223,7 @@ extension BGTaskScheduler {
             launchHandler(task)
         }
         
-        // After method swizzling, calling bt_register actually calls the original register method
+        // After method swizzling, bt_register is now the original register method
         return self.bt_register(forTaskWithIdentifier: identifier, using: queue, launchHandler: wrappedLaunchHandler)
     }
 }

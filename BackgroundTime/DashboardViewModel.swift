@@ -21,6 +21,7 @@ class DashboardViewModel: ObservableObject {
     private let dataStore: BackgroundTaskDataStore
     private var cancellables = Set<AnyCancellable>()
     private var currentTimeRange: TimeRange = .last24Hours
+    private var initialLoad = true
     
     /// The currently selected time range for filtering data
     var selectedTimeRange: TimeRange {
@@ -41,12 +42,14 @@ class DashboardViewModel: ObservableObject {
             .store(in: &cancellables)
     }
     
-    func loadData(for timeRange: TimeRange) async {
+    func loadData(for timeRange: TimeRange, forceReload: Bool = false) async {
         // Don't reload if we're already showing this time range and not loading
-        if currentTimeRange == timeRange && !isLoading {
+        // Note: We always reload for testing scenarios and when data might have changed
+        if currentTimeRange == timeRange && !isLoading && !initialLoad && !forceReload {
             return
         }
         
+        initialLoad = false
         currentTimeRange = timeRange
         isLoading = true
         error = nil
@@ -98,12 +101,12 @@ class DashboardViewModel: ObservableObject {
     }
     
     func refresh() async {
-        await loadData(for: currentTimeRange)
+        await loadData(for: currentTimeRange, forceReload: true)
     }
     
     func clearAllData() async {
         dataStore.clearAllEvents()
-        await loadData(for: currentTimeRange)
+        await loadData(for: currentTimeRange, forceReload: true)
     }
     
     func exportData() -> BackgroundTaskDashboardData {
@@ -136,7 +139,7 @@ class DashboardViewModel: ObservableObject {
             
             // Determine current status
             var currentStatus: ContinuousTaskStatus = .running
-            for event in sortedEvents.reversed() {
+            for event in sortedEvents {
                 switch event.type {
                 case .continuousTaskStarted:
                     currentStatus = .running
@@ -220,5 +223,14 @@ class DashboardViewModel: ObservableObject {
     @available(iOS 26.0, *)
     var continuousTasksInfoTyped: [ContinuousTaskInfo] {
         return continuousTasksInfo.compactMap { $0 as? ContinuousTaskInfo }
+    }
+    
+    // MARK: - Testing Support
+    
+    /// Method for testing error scenarios
+    func simulateError(_ message: String) async {
+        await MainActor.run {
+            self.error = message
+        }
     }
 }
