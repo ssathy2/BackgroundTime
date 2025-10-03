@@ -82,10 +82,6 @@ struct SocialMediaAppView: View {
                     .padding()
             }
         }
-        .task {
-            // Schedule initial background tasks
-            await backgroundManager.scheduleInitialTasks()
-        }
     }
 }
 
@@ -290,7 +286,7 @@ struct TestControlsView: View {
                 }
                 
                 Button("Schedule Processing Task") {
-                    backgroundManager.scheduleProcessingTask()
+                    backgroundManager.scheduleMediaDownload()
                 }
                 
                 Button("Cancel All Tasks") {

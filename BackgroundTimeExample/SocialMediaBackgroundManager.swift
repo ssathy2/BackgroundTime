@@ -42,9 +42,39 @@ class SocialMediaBackgroundManager: ObservableObject {
         }
     }
     
+    enum AppBackgroundTaskIdentifier {
+        case refreshSocialFeed
+        case downloadMedia
+        case syncChatMessages
+        
+        init?(stringIdentifier: String) {
+            guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return nil }
+            switch stringIdentifier {
+            case "\(bundleIdentifier)-refresh-social-feed":
+                self = .refreshSocialFeed
+            case "\(bundleIdentifier)-sync-chat-messages":
+                self = .syncChatMessages
+            default:
+                return nil
+            }
+        }
+        
+        var description: String {
+            let bundleIdentifier = Bundle.main.bundleIdentifier
+            switch self {
+            case .refreshSocialFeed:
+                return [bundleIdentifier, "refresh-social-feed"].compactMap { $0 }.joined(separator: "-")
+            case .downloadMedia:
+                return [bundleIdentifier, "download-media"].compactMap { $0 }.joined(separator: "-")
+            case .syncChatMessages:
+                return [bundleIdentifier, "sync-chat-messages"].compactMap { $0 }.joined(separator: "-")
+            }
+        }
+    }
+    
     private func registerBackgroundTaskHandlers() {
         // Register handler for social feed refresh
-        BGTaskScheduler.shared.register(forTaskWithIdentifier: "refresh-social-feed", using: nil) { task in
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: AppBackgroundTaskIdentifier.refreshSocialFeed.description, using: nil) { task in
             guard let appRefreshTask = task as? BGAppRefreshTask else {
                 task.setTaskCompleted(success: false)
                 return
@@ -55,7 +85,7 @@ class SocialMediaBackgroundManager: ObservableObject {
         }
         
         // Register handler for media download processing
-        BGTaskScheduler.shared.register(forTaskWithIdentifier: "download-media", using: nil) { task in
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: AppBackgroundTaskIdentifier.downloadMedia.description, using: nil) { task in
             guard let processingTask = task as? BGProcessingTask else {
                 task.setTaskCompleted(success: false)
                 return
@@ -66,7 +96,7 @@ class SocialMediaBackgroundManager: ObservableObject {
         }
         
         // Register handler for chat message sync
-        BGTaskScheduler.shared.register(forTaskWithIdentifier: "sync-chat-messages", using: nil) { task in
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: AppBackgroundTaskIdentifier.syncChatMessages.description, using: nil) { task in
             guard let appRefreshTask = task as? BGAppRefreshTask else {
                 task.setTaskCompleted(success: false)
                 return
@@ -90,11 +120,24 @@ class SocialMediaBackgroundManager: ObservableObject {
         }
         
         Task {
-            let success = await performFeedRefresh()
-            task.setTaskCompleted(success: success)
+            let success: Bool
+            guard let taskIdentifier = AppBackgroundTaskIdentifier(stringIdentifier: task.identifier) else {
+                task.setTaskCompleted(success: false)
+                return
+            }
             
-            // Schedule next refresh
-            scheduleAppRefreshTask()
+            switch taskIdentifier {
+            case .refreshSocialFeed:
+                success = await performFeedRefresh()
+                task.setTaskCompleted(success: success)
+                scheduleAppRefreshTask()
+            case .syncChatMessages:
+                success = await performChatSync()
+                task.setTaskCompleted(success: success)
+                scheduleChatSyncTask()
+            default:
+                task.setTaskCompleted(success: false)
+            }
         }
     }
     
@@ -108,18 +151,19 @@ class SocialMediaBackgroundManager: ObservableObject {
         
         Task {
             let success: Bool
-            
-            switch task.identifier {
-            case "download-media":
-                success = await performMediaDownload()
-            default:
-                success = await performChatSync()
+            guard let taskIdentifier = AppBackgroundTaskIdentifier(stringIdentifier: task.identifier) else {
+                task.setTaskCompleted(success: false)
+                return
             }
             
-            task.setTaskCompleted(success: success)
-            
-            // Schedule next processing task
-            scheduleProcessingTask()
+            switch taskIdentifier {
+            case .downloadMedia:
+                success = await performMediaDownload()
+                task.setTaskCompleted(success: success)
+                scheduleMediaDownload()
+            default:
+                task.setTaskCompleted(success: false)
+            }
         }
     }
     
@@ -247,14 +291,18 @@ class SocialMediaBackgroundManager: ObservableObject {
     
     // MARK: - Task Scheduling
     
-    func scheduleInitialTasks() async {
+    func scheduleTasks() async {
+        // Cancel any existing task requests before scheduling new ones
+        BGTaskScheduler.shared.cancelAllTaskRequests()
+        logger.info("Cancelled existing background tasks before scheduling new ones")
+        
         scheduleAppRefreshTask()
-        scheduleProcessingTask()
+        scheduleMediaDownload()
         scheduleChatSyncTask()
     }
     
     func scheduleAppRefreshTask() {
-        let request = BGAppRefreshTaskRequest(identifier: "refresh-social-feed")
+        let request = BGAppRefreshTaskRequest(identifier: AppBackgroundTaskIdentifier.refreshSocialFeed.description)
         request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60) // 15 minutes from now
         
         do {
@@ -265,22 +313,8 @@ class SocialMediaBackgroundManager: ObservableObject {
         }
     }
     
-    func scheduleProcessingTask() {
-        let request = BGProcessingTaskRequest(identifier: "download-media")
-        request.requiresNetworkConnectivity = true
-        request.requiresExternalPower = false
-        request.earliestBeginDate = Date(timeIntervalSinceNow: 30 * 60) // 30 minutes from now
-        
-        do {
-            try BGTaskScheduler.shared.submit(request)
-            logger.info("Scheduled processing task")
-        } catch {
-            logger.error("Failed to schedule processing task: \(error)")
-        }
-    }
-    
     func scheduleChatSyncTask() {
-        let request = BGAppRefreshTaskRequest(identifier: "sync-chat-messages")
+        let request = BGAppRefreshTaskRequest(identifier: AppBackgroundTaskIdentifier.syncChatMessages.description)
         request.earliestBeginDate = Date(timeIntervalSinceNow: 10 * 60) // 10 minutes from now
         
         do {
@@ -291,8 +325,8 @@ class SocialMediaBackgroundManager: ObservableObject {
         }
     }
     
-    func scheduleMediaDownload() async {
-        let request = BGProcessingTaskRequest(identifier: "download-media")
+    func scheduleMediaDownload() {
+        let request = BGProcessingTaskRequest(identifier: AppBackgroundTaskIdentifier.downloadMedia.description)
         request.requiresNetworkConnectivity = true
         request.requiresExternalPower = false
         request.earliestBeginDate = Date(timeIntervalSinceNow: 5) // 5 seconds for testing

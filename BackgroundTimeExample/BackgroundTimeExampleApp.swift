@@ -12,6 +12,7 @@ import BackgroundTime
 @main
 struct BackgroundTimeExampleApp: App {
     @StateObject private var backgroundManager = SocialMediaBackgroundManager()
+    @Environment(\.scenePhase) private var scenePhase
     
     init() {
         // Initialize BackgroundTime SDK with configuration optimized for social media app
@@ -44,5 +45,12 @@ struct BackgroundTimeExampleApp: App {
                 .environmentObject(backgroundManager)
         }
         .modelContainer(sharedModelContainer)
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .background {
+                Task {
+                    await backgroundManager.scheduleTasks()
+                }
+            }
+        }
     }
 }

@@ -4,9 +4,14 @@
 <dict>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>refresh-social-feed</string>
-		<string>download-media</string>
-		<string>sync-chat-messages</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)-refresh-social-feed</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)-download-media</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)-sync-chat-messages</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>processing</string>
+		<string>fetch</string>
 	</array>
 </dict>
 </plist>

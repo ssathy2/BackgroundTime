@@ -69,6 +69,7 @@
 		DE48B6D42E7E614A009A676E /* BackgroundTimeExampleUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BackgroundTimeExampleUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DE48B70E2E7E67B3009A676E /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/UIKit.framework; sourceTree = DEVELOPER_DIR; };
 		DE48B7102E7E67B8009A676E /* BackgroundTasks.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = BackgroundTasks.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/BackgroundTasks.framework; sourceTree = DEVELOPER_DIR; };
+		DEB495502E8B5F9E005D7E66 /* Package.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Package.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -79,28 +80,17 @@
 			);
 			target = DE48B6BB2E7E6148009A676E /* BackgroundTimeExample */;
 		};
-		DE9C66942E7F86D6004FC608 /* Exceptions for "BackgroundTime" folder in "BackgroundTime" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				BackgroundTime.docc,
-				Package.swift,
-			);
-			target = DE48B69D2E7E6128009A676E /* BackgroundTime */;
-		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		DE48B6A02E7E6128009A676E /* BackgroundTime */ = {
+		DE48B6A02E7E6128009A676E /* Sources */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				DE9C66942E7F86D6004FC608 /* Exceptions for "BackgroundTime" folder in "BackgroundTime" target */,
-			);
-			path = BackgroundTime;
+			path = Sources;
 			sourceTree = "<group>";
 		};
-		DE48B6AD2E7E6128009A676E /* BackgroundTimeTests */ = {
+		DE48B6AD2E7E6128009A676E /* Tests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = BackgroundTimeTests;
+			path = Tests;
 			sourceTree = "<group>";
 		};
 		DE48B6BD2E7E6148009A676E /* BackgroundTimeExample */ = {
@@ -169,8 +159,9 @@
 			children = (
 				DE3028332E85931C007DD928 /* BackgroundTimeSDK.xctestplan */,
 				DE3028352E859320007DD928 /* BackgroundTimeExample.xctestplan */,
-				DE48B6A02E7E6128009A676E /* BackgroundTime */,
-				DE48B6AD2E7E6128009A676E /* BackgroundTimeTests */,
+				DEB495502E8B5F9E005D7E66 /* Package.swift */,
+				DE48B6A02E7E6128009A676E /* Sources */,
+				DE48B6AD2E7E6128009A676E /* Tests */,
 				DE48B6BD2E7E6148009A676E /* BackgroundTimeExample */,
 				DE48B6CD2E7E614A009A676E /* BackgroundTimeExampleTests */,
 				DE48B6D72E7E614A009A676E /* BackgroundTimeExampleUITests */,
@@ -227,7 +218,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				DE48B6A02E7E6128009A676E /* BackgroundTime */,
+				DE48B6A02E7E6128009A676E /* Sources */,
 			);
 			name = BackgroundTime;
 			packageProductDependencies = (
@@ -250,7 +241,7 @@
 				DE48B6AC2E7E6128009A676E /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				DE48B6AD2E7E6128009A676E /* BackgroundTimeTests */,
+				DE48B6AD2E7E6128009A676E /* Tests */,
 			);
 			name = BackgroundTimeTests;
 			packageProductDependencies = (
