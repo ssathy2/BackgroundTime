@@ -36,7 +36,7 @@ final class NetworkManager: @unchecked Sendable {
             let jsonData = try JSONEncoder().encode(data)
             request.httpBody = jsonData
             
-            let (responseData, response) = try await session.data(for: request)
+            let (_, response) = try await session.data(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw NetworkError.invalidResponse

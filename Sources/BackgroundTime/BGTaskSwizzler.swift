@@ -36,8 +36,52 @@ final class BGTaskSwizzler: Sendable {
     private(set) static var taskStartTimesManager = TaskStartTimesManager()
     
     static func swizzleTaskMethods() {
-        swizzleSetTaskCompletedMethod()
-        logger.info("BGTask methods swizzled successfully")
+        // Swizzle each concrete BGTask subclass
+        swizzleBGAppRefreshTask()
+        swizzleBGProcessingTask()
+        if #available(iOS 26.0, *) {
+            swizzleBGContinuedProcessingTask()
+        } else {
+            // Fallback on earlier versions
+        }
+    }
+    
+    // MARK: - BGAppRefreshTask Swizzling
+    
+    private static func swizzleBGAppRefreshTask() {
+        swizzleSetTaskCompletedMethod(for: BGAppRefreshTask.self, className: "BGAppRefreshTask")
+    }
+    
+    // MARK: - BGProcessingTask Swizzling
+    
+    private static func swizzleBGProcessingTask() {
+        swizzleSetTaskCompletedMethod(for: BGProcessingTask.self, className: "BGProcessingTask")
+    }
+    
+    // MARK: - BGContinuedProcessingTask Swizzling
+    
+    @available(iOS 26.0, *)
+    private static func swizzleBGContinuedProcessingTask() {
+        swizzleSetTaskCompletedMethod(for: BGContinuedProcessingTask.self, className: "BGContinuedProcessingTask")
+    }
+    
+    // MARK: - Generic Swizzling Method
+    
+    private static func swizzleSetTaskCompletedMethod<T: BGTask>(for taskClass: T.Type, className: String) {
+        let originalSelector = #selector(BGTask.setTaskCompleted(success:))
+        let swizzledSelector = #selector(BGTask.bt_setTaskCompleted(success:))
+        
+        guard let originalMethod = class_getInstanceMethod(taskClass, originalSelector) else {
+            logger.error("❌ Failed to get original setTaskCompleted method for \(className)")
+            return
+        }
+        
+        guard let swizzledMethod = class_getInstanceMethod(BGTask.self, swizzledSelector) else {
+            logger.error("❌ Failed to get swizzled bt_setTaskCompleted method")
+            return
+        }
+        
+        method_exchangeImplementations(originalMethod, swizzledMethod)
     }
     
     static func resetTaskStartTimesManager() {
@@ -50,7 +94,8 @@ final class BGTaskSwizzler: Sendable {
             await taskStartTimesManager.setStartTime(startTime, for: taskIdentifier)
         }
         
-        // Set up expiration handler tracking
+        let logger = Logger(subsystem: "BackgroundTime", category: "TaskTracking")
+        
         nonisolated(unsafe) let originalExpirationHandler = task.expirationHandler
         
         task.expirationHandler = { @Sendable in
@@ -72,7 +117,11 @@ final class BGTaskSwizzler: Sendable {
                     duration: duration,
                     success: false,
                     errorMessage: "Task expired before completion",
-                    metadata: ["expiration_handler": "true"],
+                    metadata: [
+                        "expiration_handler": "true",
+                        "auto_tracked": "true",
+                        "tracking_method": "swizzling"
+                    ],
                     systemInfo: SystemInfo(
                         backgroundAppRefreshStatus: await UIApplication.shared.backgroundRefreshStatus,
                         deviceModel: UIDevice.current.model,
@@ -84,32 +133,19 @@ final class BGTaskSwizzler: Sendable {
                 )
                 BackgroundTaskDataStore.shared.recordEvent(event)
                 
-                // Clean up start time
+                await MainActor.run {
+                    MetricCollectionManager.shared.recordTaskExpiration(identifier: taskIdentifier)
+                }
+                
                 await taskStartTimesManager.removeStartTime(for: taskIdentifier)
             }
             
-            // Call original expiration handler - we've already captured it safely with nonisolated(unsafe)
             if let originalExpirationHandler = originalExpirationHandler {
-                // Since expiration handlers are typically main actor isolated,
-                // we need to call them on the main actor
                 Task { @MainActor in
                     originalExpirationHandler()
                 }
             }
         }
-    }
-    
-    private static func swizzleSetTaskCompletedMethod() {
-        let originalSelector = #selector(BGTask.setTaskCompleted(success:))
-        let swizzledSelector = #selector(BGTask.bt_setTaskCompleted(success:))
-        
-        guard let originalMethod = class_getInstanceMethod(BGTask.self, originalSelector),
-              let swizzledMethod = class_getInstanceMethod(BGTask.self, swizzledSelector) else {
-            logger.error("Failed to get methods for setTaskCompleted swizzling")
-            return
-        }
-        
-        method_exchangeImplementations(originalMethod, swizzledMethod)
     }
 }
 
@@ -139,7 +175,9 @@ extension BGTask {
                 errorMessage: success ? nil : "Task completed with failure",
                 metadata: [
                     "completion_success": String(success),
-                    "task_type": taskType
+                    "task_type": taskType,
+                    "auto_tracked": "true",
+                    "tracking_method": "swizzling"
                 ],
                 systemInfo: SystemInfo(
                     backgroundAppRefreshStatus: await UIApplication.shared.backgroundRefreshStatus,
@@ -152,15 +190,18 @@ extension BGTask {
             )
             BackgroundTaskDataStore.shared.recordEvent(event)
             
-            // Clean up start time
+            await MainActor.run {
+                MetricCollectionManager.shared.recordTaskExecutionEnd(
+                    identifier: taskIdentifier, 
+                    success: success, 
+                    error: success ? nil : BackgroundTaskError.taskCancelled
+                )
+            }
+            
             await BGTaskSwizzler.taskStartTimesManager.removeStartTime(for: taskIdentifier)
         }
         
-        // Call original method - after swizzling, bt_setTaskCompleted selector points to original implementation
-        let method = class_getInstanceMethod(BGTask.self, #selector(BGTask.bt_setTaskCompleted(success:)))!
-        let originalImp = method_getImplementation(method)
-        typealias SetTaskCompletedFunction = @convention(c) (BGTask, Selector, Bool) -> Void
-        let originalSetTaskCompleted = unsafeBitCast(originalImp, to: SetTaskCompletedFunction.self)
-        originalSetTaskCompleted(self, #selector(BGTask.bt_setTaskCompleted(success:)), success)
+        // Call original method (after swizzling, bt_setTaskCompleted points to the original implementation)
+        self.bt_setTaskCompleted(success: success)
     }
 }

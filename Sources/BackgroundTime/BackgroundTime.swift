@@ -18,9 +18,12 @@ public final class BackgroundTime: ObservableObject {
     public static let shared = BackgroundTime()
     
     private let logger = Logger(subsystem: "BackgroundTime", category: "SDK")
-    private var isInitialized = false
+    public private(set) var isInitialized = false
     private let dataStore = BackgroundTaskDataStore.shared
     private let networkManager = NetworkManager.shared
+    
+    // Track swizzling status for debugging
+    public private(set) var isSwizzlingEnabled = false
     
     private init() {
         logger.info("BackgroundTime SDK instance created")
@@ -100,13 +103,23 @@ public final class BackgroundTime: ObservableObject {
     // MARK: - Private Methods
     
     private func setupMethodSwizzling() {
-        Task { @MainActor in
-            // Swizzle BGTaskScheduler methods
-            BGTaskSchedulerSwizzler.swizzleSchedulerMethods()
-            
-            // Swizzle BGTask methods  
-            BGTaskSwizzler.swizzleTaskMethods()
-        }
+        // Swizzle BGTaskScheduler methods
+        BGTaskSchedulerSwizzler.swizzleSchedulerMethods()
+        
+        // Swizzle BGTask methods  
+        BGTaskSwizzler.swizzleTaskMethods()
+
+        
+        // Mark swizzling as enabled
+        isSwizzlingEnabled = true
+        
+        logger.info("🔧 Method swizzling enabled successfully")
+        
+        // Record swizzling event
+        recordSDKEvent(.initialization, metadata: [
+            "swizzling_enabled": "true",
+            "swizzling_methods": "BGTaskScheduler.register, BGTask.setTaskCompleted"
+        ])
     }
     
     private func setupAppLifecycleMonitoring() {

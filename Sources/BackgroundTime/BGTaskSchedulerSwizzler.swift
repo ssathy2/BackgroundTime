@@ -14,10 +14,14 @@ import UIKit
 @MainActor
 final class BGTaskSchedulerSwizzler {
     private static let logger = Logger(subsystem: "BackgroundTime", category: "Swizzler")
-    private static var isSwizzled = false
+    
+    // Add a flag to track if swizzling has been performed
+    private static var hasSwizzled = false
 
     static func swizzleSchedulerMethods() {
-        guard !isSwizzled else { return }
+        guard !hasSwizzled else {
+            return
+        }
         
         // Swizzle submit method
         swizzleSubmitMethod()
@@ -28,8 +32,18 @@ final class BGTaskSchedulerSwizzler {
         // Swizzle register method
         swizzleRegisterMethod()
         
-        isSwizzled = true
-        logger.info("BGTaskScheduler methods swizzled successfully")
+        hasSwizzled = true
+    }
+    
+    // Add a test method to verify swizzling worked
+    static func testSwizzling() {
+        let registerSelector = #selector(BGTaskScheduler.register(forTaskWithIdentifier:using:launchHandler:))
+        let swizzledSelector = #selector(BGTaskScheduler.bt_register(forTaskWithIdentifier:using:launchHandler:))
+        
+        let originalMethod = class_getInstanceMethod(BGTaskScheduler.self, registerSelector)
+        let swizzledMethod = class_getInstanceMethod(BGTaskScheduler.self, swizzledSelector)
+        
+        logger.info("Swizzling test - Original: \(originalMethod != nil), Swizzled: \(swizzledMethod != nil), Complete: \(hasSwizzled)")
     }
     
     private static func swizzleSubmitMethod() {
@@ -38,7 +52,6 @@ final class BGTaskSchedulerSwizzler {
         
         guard let originalMethod = class_getInstanceMethod(BGTaskScheduler.self, originalSelector),
               let swizzledMethod = class_getInstanceMethod(BGTaskScheduler.self, swizzledSelector) else {
-            logger.error("Failed to get methods for submit swizzling")
             return
         }
         
@@ -52,7 +65,6 @@ final class BGTaskSchedulerSwizzler {
         
         guard let cancelMethod = class_getInstanceMethod(BGTaskScheduler.self, cancelSelector),
               let swizzledCancelMethod = class_getInstanceMethod(BGTaskScheduler.self, swizzledCancelSelector) else {
-            logger.error("Failed to get methods for cancel swizzling")
             return
         }
         
@@ -64,7 +76,6 @@ final class BGTaskSchedulerSwizzler {
         
         guard let cancelAllMethod = class_getInstanceMethod(BGTaskScheduler.self, cancelAllSelector),
               let swizzledCancelAllMethod = class_getInstanceMethod(BGTaskScheduler.self, swizzledCancelAllSelector) else {
-            logger.error("Failed to get methods for cancelAll swizzling")
             return
         }
         
@@ -77,7 +88,6 @@ final class BGTaskSchedulerSwizzler {
         
         guard let registerMethod = class_getInstanceMethod(BGTaskScheduler.self, registerSelector),
               let swizzledRegisterMethod = class_getInstanceMethod(BGTaskScheduler.self, swizzledSelector) else {
-            logger.error("Failed to get methods for register swizzling")
             return
         }
         
@@ -90,6 +100,30 @@ final class BGTaskSchedulerSwizzler {
 extension BGTaskScheduler {
     @objc dynamic func bt_submit(_ taskRequest: BGTaskRequest) throws {
         let startTime = Date()
+        
+        // Capture system info on main thread if needed
+        let systemInfo: SystemInfo
+        if Thread.isMainThread {
+            systemInfo = SystemInfo(
+                backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
+                deviceModel: UIDevice.current.model,
+                systemVersion: UIDevice.current.systemVersion,
+                lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                batteryLevel: UIDevice.current.batteryLevel,
+                batteryState: UIDevice.current.batteryState
+            )
+        } else {
+            systemInfo = DispatchQueue.main.sync {
+                SystemInfo(
+                    backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
+                    deviceModel: UIDevice.current.model,
+                    systemVersion: UIDevice.current.systemVersion,
+                    lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                    batteryLevel: UIDevice.current.batteryLevel,
+                    batteryState: UIDevice.current.batteryState
+                )
+            }
+        }
         
         // Record the scheduling attempt
         let event = BackgroundTaskEvent(
@@ -105,14 +139,7 @@ extension BGTaskScheduler {
                 "requiresNetworkConnectivity": String(taskRequest is BGAppRefreshTaskRequest ? false : (taskRequest as? BGProcessingTaskRequest)?.requiresNetworkConnectivity ?? false),
                 "requiresExternalPower": String(taskRequest is BGAppRefreshTaskRequest ? false : (taskRequest as? BGProcessingTaskRequest)?.requiresExternalPower ?? false)
             ],
-            systemInfo: SystemInfo(
-                backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
-                deviceModel: UIDevice.current.model,
-                systemVersion: UIDevice.current.systemVersion,
-                lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
-                batteryLevel: UIDevice.current.batteryLevel,
-                batteryState: UIDevice.current.batteryState
-            )
+            systemInfo: systemInfo
         )
         
         // Try to submit the task and handle any errors
@@ -131,7 +158,7 @@ extension BGTaskScheduler {
                 success: false,
                 errorMessage: error.localizedDescription,
                 metadata: event.metadata,
-                systemInfo: event.systemInfo
+                systemInfo: systemInfo
             )
             BackgroundTaskDataStore.shared.recordEvent(failureEvent)
             throw error
@@ -139,6 +166,30 @@ extension BGTaskScheduler {
     }
     
     @objc dynamic func bt_cancel(taskRequestWithIdentifier identifier: String) {
+        // Capture system info on main thread if needed
+        let systemInfo: SystemInfo
+        if Thread.isMainThread {
+            systemInfo = SystemInfo(
+                backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
+                deviceModel: UIDevice.current.model,
+                systemVersion: UIDevice.current.systemVersion,
+                lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                batteryLevel: UIDevice.current.batteryLevel,
+                batteryState: UIDevice.current.batteryState
+            )
+        } else {
+            systemInfo = DispatchQueue.main.sync {
+                SystemInfo(
+                    backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
+                    deviceModel: UIDevice.current.model,
+                    systemVersion: UIDevice.current.systemVersion,
+                    lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                    batteryLevel: UIDevice.current.batteryLevel,
+                    batteryState: UIDevice.current.batteryState
+                )
+            }
+        }
+        
         let event = BackgroundTaskEvent(
             id: UUID(),
             taskIdentifier: identifier,
@@ -148,14 +199,7 @@ extension BGTaskScheduler {
             success: true,
             errorMessage: nil,
             metadata: ["reason": "manual_cancellation"],
-            systemInfo: SystemInfo(
-                backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
-                deviceModel: UIDevice.current.model,
-                systemVersion: UIDevice.current.systemVersion,
-                lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
-                batteryLevel: UIDevice.current.batteryLevel,
-                batteryState: UIDevice.current.batteryState
-            )
+            systemInfo: systemInfo
         )
         
         BackgroundTaskDataStore.shared.recordEvent(event)
@@ -165,6 +209,30 @@ extension BGTaskScheduler {
     }
     
     @objc dynamic func bt_cancelAllTaskRequests() {
+        // Capture system info on main thread if needed
+        let systemInfo: SystemInfo
+        if Thread.isMainThread {
+            systemInfo = SystemInfo(
+                backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
+                deviceModel: UIDevice.current.model,
+                systemVersion: UIDevice.current.systemVersion,
+                lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                batteryLevel: UIDevice.current.batteryLevel,
+                batteryState: UIDevice.current.batteryState
+            )
+        } else {
+            systemInfo = DispatchQueue.main.sync {
+                SystemInfo(
+                    backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
+                    deviceModel: UIDevice.current.model,
+                    systemVersion: UIDevice.current.systemVersion,
+                    lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                    batteryLevel: UIDevice.current.batteryLevel,
+                    batteryState: UIDevice.current.batteryState
+                )
+            }
+        }
+        
         let event = BackgroundTaskEvent(
             id: UUID(),
             taskIdentifier: "ALL_TASKS",
@@ -174,14 +242,7 @@ extension BGTaskScheduler {
             success: true,
             errorMessage: nil,
             metadata: ["reason": "cancel_all_tasks"],
-            systemInfo: SystemInfo(
-                backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
-                deviceModel: UIDevice.current.model,
-                systemVersion: UIDevice.current.systemVersion,
-                lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
-                batteryLevel: UIDevice.current.batteryLevel,
-                batteryState: UIDevice.current.batteryState
-            )
+            systemInfo: systemInfo
         )
         
         BackgroundTaskDataStore.shared.recordEvent(event)
@@ -195,6 +256,40 @@ extension BGTaskScheduler {
         let wrappedLaunchHandler: (BGTask) -> Void = { task in
             let startTime = Date()
             
+            // Log the exact type of task we received
+            let taskType = String(describing: type(of: task))
+            print("📋 Task type received: \(taskType) for identifier: \(identifier)")
+            
+            // Check if this task instance responds to our swizzled method
+            let respondsToOriginal = task.responds(to: #selector(BGTask.setTaskCompleted(success:)))
+            let respondsToSwizzled = task.responds(to: #selector(BGTask.bt_setTaskCompleted(success:)))
+            print("📋 Task responds to setTaskCompleted: \(respondsToOriginal)")
+            print("📋 Task responds to bt_setTaskCompleted: \(respondsToSwizzled)")
+            
+            // Capture system info safely
+            let systemInfo: SystemInfo
+            if Thread.isMainThread {
+                systemInfo = SystemInfo(
+                    backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
+                    deviceModel: UIDevice.current.model,
+                    systemVersion: UIDevice.current.systemVersion,
+                    lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                    batteryLevel: UIDevice.current.batteryLevel,
+                    batteryState: UIDevice.current.batteryState
+                )
+            } else {
+                systemInfo = DispatchQueue.main.sync {
+                    SystemInfo(
+                        backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
+                        deviceModel: UIDevice.current.model,
+                        systemVersion: UIDevice.current.systemVersion,
+                        lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                        batteryLevel: UIDevice.current.batteryLevel,
+                        batteryState: UIDevice.current.batteryState
+                    )
+                }
+            }
+            
             // Record task execution start
             let startEvent = BackgroundTaskEvent(
                 id: UUID(),
@@ -204,28 +299,72 @@ extension BGTaskScheduler {
                 duration: nil,
                 success: true,
                 errorMessage: nil,
-                metadata: ["task_type": String(describing: type(of: task))],
-                systemInfo: SystemInfo(
-                    backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
-                    deviceModel: UIDevice.current.model,
-                    systemVersion: UIDevice.current.systemVersion,
-                    lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
-                    batteryLevel: UIDevice.current.batteryLevel,
-                    batteryState: UIDevice.current.batteryState
-                )
+                metadata: [
+                    "task_type": String(describing: type(of: task)),
+                    "auto_tracked": "true",
+                    "tracking_method": "swizzling"
+                ],
+                systemInfo: systemInfo
             )
             BackgroundTaskDataStore.shared.recordEvent(startEvent)
             
-            // Swizzle the task's setTaskCompleted method
-            // Extract needed values before entering async context to avoid data races
+            // Set up automatic completion tracking
             BGTaskSwizzler.swizzleTaskCompletion(for: task, startTime: startTime)
+            
+            // Notify MetricCollectionManager for performance tracking
+            Task { @MainActor in
+                MetricCollectionManager.shared.recordTaskExecutionStart(identifier: identifier)
+            }
+            
+            // Wrap the original expiration handler to ensure proper cleanup
+            let originalExpirationHandler = task.expirationHandler
+            task.expirationHandler = {
+                // Record expiration event
+                Task { @MainActor in
+                    MetricCollectionManager.shared.recordTaskExpiration(identifier: identifier)
+                }
+                
+                // Call original handler if it exists
+                originalExpirationHandler?()
+            }
             
             // Call the original launch handler
             launchHandler(task)
         }
         
-        // After method swizzling, bt_register is now the original register method
-        return self.bt_register(forTaskWithIdentifier: identifier, using: queue, launchHandler: wrappedLaunchHandler)
+        // Call the original register method (after swizzling, bt_register points to the original implementation)
+        let result = self.bt_register(forTaskWithIdentifier: identifier, using: queue, launchHandler: wrappedLaunchHandler)
+        
+        // Record registration attempt
+        Task { @MainActor in
+            let systemInfo = SystemInfo(
+                backgroundAppRefreshStatus: UIApplication.shared.backgroundRefreshStatus,
+                deviceModel: UIDevice.current.model,
+                systemVersion: UIDevice.current.systemVersion,
+                lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                batteryLevel: UIDevice.current.batteryLevel,
+                batteryState: UIDevice.current.batteryState
+            )
+            
+            let registrationEvent = BackgroundTaskEvent(
+                id: UUID(),
+                taskIdentifier: identifier,
+                type: result ? .taskScheduled : .taskFailed,
+                timestamp: Date(),
+                duration: nil,
+                success: result,
+                errorMessage: result ? nil : "Task registration failed",
+                metadata: [
+                    "registration_success": String(result),
+                    "auto_tracked": "true",
+                    "tracking_method": "swizzling"
+                ],
+                systemInfo: systemInfo
+            )
+            BackgroundTaskDataStore.shared.recordEvent(registrationEvent)
+        }
+        
+        return result
     }
 }
 
