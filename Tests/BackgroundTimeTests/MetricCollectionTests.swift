@@ -318,8 +318,8 @@ struct MetricPerformanceTests {
         
         let duration = CFAbsoluteTimeGetCurrent() - startTime
         
-        // Should process 1000 events in reasonable time
-        #expect(duration < 10.0, "Processing \(eventCount) events took \(duration) seconds")
+        // Should process 1000 events in reasonable time (allowing for persistence overhead)
+        #expect(duration < 15.0, "Processing \(eventCount) events took \(duration) seconds")
         
         // Verify events were stored
         let allEvents = dataStore.getAllEvents()

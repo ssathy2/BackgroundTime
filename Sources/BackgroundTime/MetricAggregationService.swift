@@ -110,7 +110,6 @@ public final class MetricAggregationService: Sendable {
             totalTasksExpired: expiredEvents.count,
             averageExecutionDuration: averageExecutionDuration,
             averageSchedulingLatency: averageSchedulingLatency,
-            successRate: successRate,
             executionTimeDistribution: executionTimeDistribution,
             hourlyExecutionPattern: hourlyExecutionPattern
         )

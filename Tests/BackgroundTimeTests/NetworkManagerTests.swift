@@ -11,7 +11,7 @@ import UIKit
 import BackgroundTasks
 @testable import BackgroundTime
 
-@Suite("Network Manager Tests")
+@Suite("Network Manager Tests", .serialized)
 struct NetworkManagerTests {
     
     @Test("NetworkManager configuration with various endpoints")
@@ -20,6 +20,9 @@ struct NetworkManagerTests {
         
         // Reset singleton state before test to avoid interference
         networkManager.configure(apiEndpoint: nil)
+        
+        // Small delay to ensure any concurrent operations complete
+        try await Task.sleep(nanoseconds: 10_000_000) // 0.01 seconds
         
         // Test configuration with nil endpoint
         networkManager.configure(apiEndpoint: nil)
@@ -45,6 +48,9 @@ struct NetworkManagerTests {
         networkManager.configure(apiEndpoint: nil) // Reset to nil
         
         #expect(true, "NetworkManager should handle reconfiguration gracefully")
+        
+        // Cleanup - reset to nil to avoid affecting other tests
+        networkManager.configure(apiEndpoint: nil)
     }
     
     @Test("NetworkManager upload dashboard data error scenarios")
@@ -127,6 +133,9 @@ struct NetworkManagerTests {
             // Expected to fail due to invalid endpoint
             #expect(error != nil, "Should handle network errors gracefully")
         }
+        
+        // Clean up singleton state
+        networkManager.configure(apiEndpoint: nil)
     }
     
     @Test("NetworkError comprehensive error descriptions")
@@ -233,6 +242,9 @@ struct NetworkManagerTests {
         instance1.configure(apiEndpoint: testEndpoint)
         
         #expect(true, "Singleton configuration should work without issues")
+        
+        // Clean up singleton state
+        NetworkManager.shared.configure(apiEndpoint: nil)
     }
 }
 

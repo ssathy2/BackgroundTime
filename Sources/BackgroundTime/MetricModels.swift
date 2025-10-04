@@ -497,6 +497,37 @@ public struct TaskMetricsSummary: Codable {
     public let successRate: Double
     public let executionTimeDistribution: [String: Int] // Duration categories
     public let hourlyExecutionPattern: [Int: Int] // Hour -> Count
+    
+    public init(
+        totalTasksScheduled: Int,
+        totalTasksExecuted: Int,
+        totalTasksCompleted: Int,
+        totalTasksFailed: Int,
+        totalTasksExpired: Int,
+        averageExecutionDuration: TimeInterval,
+        averageSchedulingLatency: TimeInterval,
+        executionTimeDistribution: [String: Int],
+        hourlyExecutionPattern: [Int: Int]
+    ) {
+        self.totalTasksScheduled = totalTasksScheduled
+        self.totalTasksExecuted = totalTasksExecuted
+        self.totalTasksCompleted = totalTasksCompleted
+        self.totalTasksFailed = totalTasksFailed
+        self.totalTasksExpired = totalTasksExpired
+        self.averageExecutionDuration = averageExecutionDuration
+        self.averageSchedulingLatency = averageSchedulingLatency
+        self.executionTimeDistribution = executionTimeDistribution
+        self.hourlyExecutionPattern = hourlyExecutionPattern
+        
+        // Calculate success rate: successful completions / total executed attempts
+        if totalTasksExecuted > 0 {
+            // Successful completions = total completed - failed completions
+            let successfulCompletions = max(0, totalTasksCompleted - (totalTasksFailed - totalTasksExpired))
+            self.successRate = Double(successfulCompletions) / Double(totalTasksExecuted)
+        } else {
+            self.successRate = 0.0
+        }
+    }
 }
 
 public struct PerformanceMetricsSummary: Codable {
@@ -638,17 +669,56 @@ public struct BackgroundTaskEventDebugger {
             }
         }
         
-        // Analyze task lifecycle completeness
+        // Analyze task lifecycle completeness and success rate accuracy
         let taskGroups = Dictionary(grouping: events.filter { $0.taskIdentifier != "SDK_EVENT" }) { $0.taskIdentifier }
         
         print("\n📱 Task Lifecycle Analysis:")
+        var totalExecuted = 0
+        var totalSuccessful = 0
+        var totalFailed = 0
+        
         for (taskId, taskEvents) in taskGroups {
             let eventTypes = Set(taskEvents.map { $0.type })
             let hasStart = eventTypes.contains(.taskExecutionStarted)
-            let hasEnd = eventTypes.contains(.taskExecutionCompleted) || eventTypes.contains(.taskExpired)
+            let hasCompletion = eventTypes.contains(.taskExecutionCompleted)
+            let hasExpired = eventTypes.contains(.taskExpired)
+            let hasFailed = eventTypes.contains(.taskFailed)
+            let hasEnd = hasCompletion || hasExpired || hasFailed
+            
+            // Count execution attempts for this task
+            let executionStartEvents = taskEvents.filter { $0.type == .taskExecutionStarted }
+            let completionEvents = taskEvents.filter { $0.type == .taskExecutionCompleted }
+            let successfulCompletions = completionEvents.filter { $0.success }.count
+            let failedCompletions = completionEvents.filter { !$0.success }.count + taskEvents.filter { $0.type == .taskExpired }.count
+            
+            let taskExecuted = !executionStartEvents.isEmpty ? executionStartEvents.count : completionEvents.count
+            totalExecuted += taskExecuted
+            totalSuccessful += successfulCompletions
+            totalFailed += failedCompletions
             
             let status = hasStart && hasEnd ? "✅" : hasStart ? "⚠️" : "❌"
-            print("   \(status) \(taskId): Start=\(hasStart ? "✓" : "✗"), End=\(hasEnd ? "✓" : "✗")")
+            let successRateStr = taskExecuted > 0 ? String(format: "%.1f%%", Double(successfulCompletions) / Double(taskExecuted) * 100) : "N/A"
+            print("   \(status) \(taskId): Start=\(hasStart ? "✓" : "✗"), End=\(hasEnd ? "✓" : "✗"), Success Rate=\(successRateStr)")
+        }
+        
+        // Overall success rate analysis
+        print("\n📈 Success Rate Analysis:")
+        if totalExecuted > 0 {
+            let overallSuccessRate = Double(totalSuccessful) / Double(totalExecuted) * 100
+            print("   Overall Success Rate: \(String(format: "%.1f%%", overallSuccessRate)) (\(totalSuccessful)/\(totalExecuted))")
+            print("   Total Executed: \(totalExecuted)")
+            print("   Total Successful: \(totalSuccessful)")
+            print("   Total Failed: \(totalFailed)")
+            
+            if overallSuccessRate < 70 {
+                print("   ⚠️  Success rate is below 70% - consider investigating failures")
+            } else if overallSuccessRate >= 90 {
+                print("   ✅ Excellent success rate!")
+            } else {
+                print("   ℹ️  Good success rate")
+            }
+        } else {
+            print("   No task executions recorded yet")
         }
         
         if taskGroups.values.contains(where: { taskEvents in
@@ -868,6 +938,77 @@ public struct BackgroundTimeSwizzlingHelper {
             print("   4. Call diagnoseLaunchHandlerIssue() to verify events were recorded")
         } else {
             print("\n❌ Registration failed - check your Info.plist BGTaskSchedulerPermittedIdentifiers")
+        }
+    }
+    
+    /// Verify success rate calculation accuracy
+    @MainActor
+    public static func verifySuccessRateCalculation() {
+        let events = BackgroundTime.shared.getAllEvents()
+        
+        print("\n📊 Success Rate Calculation Verification")
+        print(String(repeating: "=", count: 42))
+        
+        // Get current statistics
+        let statistics = BackgroundTime.shared.getCurrentStats()
+        
+        print("🔢 Current Statistics:")
+        print("   Total Executed: \(statistics.totalTasksExecuted)")
+        print("   Total Completed: \(statistics.totalTasksCompleted)")
+        print("   Total Failed: \(statistics.totalTasksFailed)")
+        print("   Total Expired: \(statistics.totalTasksExpired)")
+        print("   Success Rate: \(String(format: "%.1f%%", statistics.successRate * 100))")
+        
+        // Manual calculation verification
+        let executionStartedEvents = events.filter { $0.type == .taskExecutionStarted }
+        let completionEvents = events.filter { $0.type == .taskExecutionCompleted }
+        let failedEvents = events.filter { $0.type == .taskFailed }
+        let expiredEvents = events.filter { $0.type == .taskExpired }
+        
+        let manualTotalExecuted = !executionStartedEvents.isEmpty ? executionStartedEvents.count : completionEvents.count
+        let manualSuccessfulCompletions = completionEvents.filter { $0.success }.count
+        let manualSuccessRate = manualTotalExecuted > 0 ? Double(manualSuccessfulCompletions) / Double(manualTotalExecuted) : 0.0
+        
+        print("\n🧮 Manual Verification:")
+        print("   Execution Started Events: \(executionStartedEvents.count)")
+        print("   Completion Events: \(completionEvents.count)")
+        print("   Successful Completions: \(manualSuccessfulCompletions)")
+        print("   Failed Events: \(failedEvents.count)")
+        print("   Expired Events: \(expiredEvents.count)")
+        print("   Manual Success Rate: \(String(format: "%.1f%%", manualSuccessRate * 100))")
+        
+        // Compare calculations
+        print("\n✅ Verification Results:")
+        let executedMatch = statistics.totalTasksExecuted == manualTotalExecuted
+        let successRateMatch = abs(statistics.successRate - manualSuccessRate) < 0.001
+        
+        print("   Executed Count Match: \(executedMatch ? "✅" : "❌") (\(statistics.totalTasksExecuted) vs \(manualTotalExecuted))")
+        print("   Success Rate Match: \(successRateMatch ? "✅" : "❌") (\(String(format: "%.3f", statistics.successRate)) vs \(String(format: "%.3f", manualSuccessRate)))")
+        
+        if !executedMatch || !successRateMatch {
+            print("\n⚠️  Success rate calculation discrepancy detected!")
+            print("💡 This may indicate:")
+            print("   1. Event tracking inconsistencies")
+            print("   2. Calculation logic differences")
+            print("   3. Missing or duplicate events")
+        } else {
+            print("\n✅ Success rate calculations are accurate!")
+        }
+        
+        // Task-by-task breakdown
+        let taskGroups = Dictionary(grouping: events.filter { $0.taskIdentifier != "SDK_EVENT" }) { $0.taskIdentifier }
+        
+        if !taskGroups.isEmpty {
+            print("\n📋 Per-Task Success Rates:")
+            for (taskId, taskEvents) in taskGroups.sorted(by: { $0.key < $1.key }) {
+                let taskStartEvents = taskEvents.filter { $0.type == .taskExecutionStarted }
+                let taskCompletionEvents = taskEvents.filter { $0.type == .taskExecutionCompleted }
+                let taskExecutedCount = !taskStartEvents.isEmpty ? taskStartEvents.count : taskCompletionEvents.count
+                let taskSuccessfulCount = taskCompletionEvents.filter { $0.success }.count
+                let taskSuccessRate = taskExecutedCount > 0 ? Double(taskSuccessfulCount) / Double(taskExecutedCount) : 0.0
+                
+                print("   \(taskId): \(String(format: "%.1f%%", taskSuccessRate * 100)) (\(taskSuccessfulCount)/\(taskExecutedCount))")
+            }
         }
     }
 }

@@ -14,13 +14,22 @@ final class NetworkManager: @unchecked Sendable {
     static let shared = NetworkManager()
         
     private let logger = Logger(subsystem: "BackgroundTime", category: "Network")
-    private var apiEndpoint: URL?
+    private var _apiEndpoint: URL?
+    private let endpointQueue = DispatchQueue(label: "com.backgroundtime.networkmanager.endpoint", attributes: .concurrent)
     private let session = URLSession(configuration: .default)
     
     private init() {}
     
     func configure(apiEndpoint: URL?) {
-        self.apiEndpoint = apiEndpoint
+        endpointQueue.sync(flags: .barrier) {
+            self._apiEndpoint = apiEndpoint
+        }
+    }
+    
+    private var apiEndpoint: URL? {
+        return endpointQueue.sync {
+            return _apiEndpoint
+        }
     }
     
     func uploadDashboardData(_ data: BackgroundTaskDashboardData) async throws {

@@ -93,9 +93,7 @@ final class BGTaskSwizzler: Sendable {
         Task { @Sendable in
             await taskStartTimesManager.setStartTime(startTime, for: taskIdentifier)
         }
-        
-        let logger = Logger(subsystem: "BackgroundTime", category: "TaskTracking")
-        
+                
         nonisolated(unsafe) let originalExpirationHandler = task.expirationHandler
         
         task.expirationHandler = { @Sendable in

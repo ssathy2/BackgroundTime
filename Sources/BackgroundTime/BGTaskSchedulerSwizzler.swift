@@ -256,16 +256,6 @@ extension BGTaskScheduler {
         let wrappedLaunchHandler: (BGTask) -> Void = { task in
             let startTime = Date()
             
-            // Log the exact type of task we received
-            let taskType = String(describing: type(of: task))
-            print("📋 Task type received: \(taskType) for identifier: \(identifier)")
-            
-            // Check if this task instance responds to our swizzled method
-            let respondsToOriginal = task.responds(to: #selector(BGTask.setTaskCompleted(success:)))
-            let respondsToSwizzled = task.responds(to: #selector(BGTask.bt_setTaskCompleted(success:)))
-            print("📋 Task responds to setTaskCompleted: \(respondsToOriginal)")
-            print("📋 Task responds to bt_setTaskCompleted: \(respondsToSwizzled)")
-            
             // Capture system info safely
             let systemInfo: SystemInfo
             if Thread.isMainThread {

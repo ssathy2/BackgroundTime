@@ -77,6 +77,19 @@ struct SDKTests {
         #expect(stats.totalTasksExecuted >= 0, "Should return valid execution count")
         #expect(stats.successRate >= 0.0 && stats.successRate <= 1.0, "Success rate should be between 0 and 1")
         
+        // Verify success rate calculation consistency
+        if stats.totalTasksExecuted > 0 {
+            // If there are executed tasks, verify the success rate makes sense
+            let expectedMaxSuccesses = stats.totalTasksCompleted
+            let maxPossibleSuccessRate = stats.totalTasksExecuted > 0 ? 
+                Double(expectedMaxSuccesses) / Double(stats.totalTasksExecuted) : 0.0
+            #expect(stats.successRate <= maxPossibleSuccessRate + 0.001, 
+                   "Success rate should not exceed theoretical maximum based on completed tasks")
+        } else {
+            // If no tasks executed, success rate should be 0
+            #expect(stats.successRate == 0.0, "Success rate should be 0 when no tasks executed")
+        }
+        
         let events = await MainActor.run { return sdk.getAllEvents() }
         #expect(events.count >= 0, "Should return events array")
         

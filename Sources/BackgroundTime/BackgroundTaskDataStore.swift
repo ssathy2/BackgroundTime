@@ -115,59 +115,66 @@ final class BackgroundTaskDataStore: @unchecked Sendable {
     
     private func generateStatisticsInternal(from events: [BackgroundTaskEvent]) -> BackgroundTaskStatistics {
         let totalScheduled = events.filter { $0.type == .taskScheduled }.count
-        let totalExecuted = events.filter { $0.type == .taskExecutionStarted }.count
         
-        // Handle both successful taskExecutionCompleted and standalone successful events
-        let completedSuccessfully = events.filter { 
-            ($0.type == .taskExecutionCompleted && $0.success) ||
-            ($0.type == .taskExecutionStarted && $0.success) // Fallback for partial event recording
-        }.count
+        // Count distinct task execution attempts by tracking unique task identifiers that started execution
+        let executionStartedEvents = events.filter { $0.type == .taskExecutionStarted }
+        let completionEvents = events.filter { $0.type == .taskExecutionCompleted }
+        let failedEvents = events.filter { $0.type == .taskFailed }
+        let expiredEvents = events.filter { $0.type == .taskExpired }
         
-        let totalFailed = events.filter { 
-            $0.type == .taskFailed || 
-            ($0.type == .taskExecutionCompleted && !$0.success) ||
-            ($0.type == .taskExecutionStarted && !$0.success) // Fallback for partial event recording
-        }.count
+        // Primary approach: Use execution started events if available
+        let totalExecuted = !executionStartedEvents.isEmpty ? executionStartedEvents.count : completionEvents.count
         
-        let totalExpired = events.filter { $0.type == .taskExpired }.count
+        // Count successful completions
+        let successfulCompletions = completionEvents.filter { $0.success }.count
         
-        // For total completed, use the higher of the two counts to handle partial recording
-        let totalCompleted = max(completedSuccessfully, events.filter { $0.type == .taskExecutionCompleted }.count)
+        // Count explicit failures
+        let explicitFailures = failedEvents.count + completionEvents.filter { !$0.success }.count
         
-        // For total executed, if we don't have taskExecutionStarted events, 
-        // infer from taskExecutionCompleted events
-        let actualTotalExecuted = totalExecuted > 0 ? totalExecuted : 
-            events.filter { $0.type == .taskExecutionCompleted }.count
+        let totalExpired = expiredEvents.count
         
-        let completedEvents = events.filter { 
-            ($0.type == .taskExecutionCompleted || $0.type == .taskExecutionStarted) && 
-            $0.duration != nil 
+        // Total completed includes both successful and failed completions (but not expired)
+        let totalCompleted = completionEvents.count
+        
+        // Total failed includes explicit failures and expired tasks
+        let totalFailed = explicitFailures + totalExpired
+        
+        // Calculate average execution time from completed events (successful or failed) with duration
+        let eventsWithDuration = completionEvents.filter { $0.duration != nil }
+        let averageExecutionTime = eventsWithDuration.isEmpty ? 0 : 
+            eventsWithDuration.compactMap { $0.duration }.reduce(0, +) / Double(eventsWithDuration.count)
+        
+        // Success rate calculation: successful completions / total executed attempts
+        // If we have no execution attempts recorded, success rate is 0
+        let successRate: Double
+        if totalExecuted > 0 {
+            successRate = Double(successfulCompletions) / Double(totalExecuted)
+        } else {
+            successRate = 0.0
         }
         
-        let averageExecutionTime = completedEvents.isEmpty ? 0 : 
-            completedEvents.compactMap { $0.duration }.reduce(0, +) / Double(completedEvents.count)
-        
-        let successRate = actualTotalExecuted > 0 ? Double(completedSuccessfully) / Double(actualTotalExecuted) : 0
-        
-        let executionsByHour = Dictionary(grouping: events.filter { 
-            $0.type == .taskExecutionStarted || 
-            ($0.type == .taskExecutionCompleted && totalExecuted == 0) // Fallback if no start events
-        }) { event in
+        // Group executions by hour (prefer execution started events, fallback to completion events)
+        let executionsByHour = Dictionary(grouping: !executionStartedEvents.isEmpty ? executionStartedEvents : completionEvents) { event in
             Calendar.current.component(.hour, from: event.timestamp)
         }.mapValues { $0.count }
         
-        let errorsByType = Dictionary(grouping: events.filter { !$0.success && $0.errorMessage != nil }) { event in
-            event.errorMessage ?? "Unknown Error"
+        // Group errors by type from failed events and unsuccessful completion events
+        let errorEvents = events.filter { 
+            $0.type == .taskFailed || 
+            ($0.type == .taskExecutionCompleted && !$0.success) ||
+            $0.type == .taskExpired
+        }
+        let errorsByType = Dictionary(grouping: errorEvents) { event in
+            event.errorMessage?.isEmpty == false ? event.errorMessage! : "Unknown Error"
         }.mapValues { $0.count }
         
-        let lastExecutionTime = events
-            .filter { $0.type == .taskExecutionStarted || 
-                     ($0.type == .taskExecutionCompleted && totalExecuted == 0) }
+        // Last execution time from started events or completion events
+        let lastExecutionTime = (!executionStartedEvents.isEmpty ? executionStartedEvents : completionEvents)
             .max(by: { $0.timestamp < $1.timestamp })?.timestamp
         
         return BackgroundTaskStatistics(
             totalTasksScheduled: totalScheduled,
-            totalTasksExecuted: actualTotalExecuted,
+            totalTasksExecuted: totalExecuted,
             totalTasksCompleted: totalCompleted,
             totalTasksFailed: totalFailed,
             totalTasksExpired: totalExpired,
@@ -246,23 +253,47 @@ extension BackgroundTaskDataStore {
         let scheduledEvents = taskEvents.filter { $0.type == .taskScheduled }
         let executedEvents = taskEvents.filter { $0.type == .taskExecutionStarted }
         let completedEvents = taskEvents.filter { $0.type == .taskExecutionCompleted }
-        let failedEvents = taskEvents.filter { $0.type == .taskFailed || ($0.type == .taskExecutionCompleted && !$0.success) }
+        let failedEvents = taskEvents.filter { $0.type == .taskFailed }
+        let expiredEvents = taskEvents.filter { $0.type == .taskExpired }
         
-        let averageDuration = completedEvents.compactMap { $0.duration }.isEmpty ? 0 :
-            completedEvents.compactMap { $0.duration }.reduce(0, +) / Double(completedEvents.count)
+        // Use execution started events if available, otherwise infer from completion events
+        let totalExecuted = !executedEvents.isEmpty ? executedEvents.count : completedEvents.count
         
-        let successRate = executedEvents.count > 0 ? 
-            Double(completedEvents.filter { $0.success }.count) / Double(executedEvents.count) : 0
+        // Count successful completions
+        let successfulCompletions = completedEvents.filter { $0.success }.count
+        
+        // Count explicit failures and unsuccessful completions
+        let explicitFailures = failedEvents.count + completedEvents.filter { !$0.success }.count
+        
+        // Total failed includes failures and expired tasks
+        let totalFailed = explicitFailures + expiredEvents.count
+        
+        // Calculate average duration from events with duration data
+        let eventsWithDuration = completedEvents.filter { $0.duration != nil }
+        let averageDuration = eventsWithDuration.isEmpty ? 0 :
+            eventsWithDuration.compactMap { $0.duration }.reduce(0, +) / Double(eventsWithDuration.count)
+        
+        // Success rate calculation: successful completions / total executed attempts
+        let successRate: Double
+        if totalExecuted > 0 {
+            successRate = Double(successfulCompletions) / Double(totalExecuted)
+        } else {
+            successRate = 0.0
+        }
+        
+        // Find the most recent execution start time
+        let lastExecutionDate = (!executedEvents.isEmpty ? executedEvents : completedEvents)
+            .max(by: { $0.timestamp < $1.timestamp })?.timestamp
         
         return TaskPerformanceMetrics(
             taskIdentifier: taskIdentifier,
             totalScheduled: scheduledEvents.count,
-            totalExecuted: executedEvents.count,
+            totalExecuted: totalExecuted,
             totalCompleted: completedEvents.count,
-            totalFailed: failedEvents.count,
+            totalFailed: totalFailed,
             averageDuration: averageDuration,
             successRate: successRate,
-            lastExecutionDate: executedEvents.max(by: { $0.timestamp < $1.timestamp })?.timestamp
+            lastExecutionDate: lastExecutionDate
         )
     }
     
