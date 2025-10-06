@@ -152,7 +152,20 @@ final class BackgroundTaskDataStore: @unchecked Sendable {
         // If we have no execution attempts recorded, success rate is 0
         let successRate: Double
         if totalExecuted > 0 {
-            successRate = Double(successfulCompletions) / Double(totalExecuted)
+            let rate = Double(successfulCompletions) / Double(totalExecuted)
+            // Ensure success rate is always between 0.0 and 1.0 (defensive programming)
+            successRate = min(max(rate, 0.0), 1.0)
+            
+            // Debug logging for unusual success rates
+            if rate > 1.0 {
+                logger.warning("⚠️ Success rate calculation anomaly detected:")
+                logger.warning("  - Total executed: \(totalExecuted)")
+                logger.warning("  - Successful completions: \(successfulCompletions)")
+                logger.warning("  - Raw success rate: \(rate) (\(rate * 100)%)")
+                logger.warning("  - Clamped to: \(successRate) (\(successRate * 100)%)")
+                logger.warning("  - Execution started events: \(executionStartedEvents.count)")
+                logger.warning("  - Completion events: \(completionEvents.count)")
+            }
         } else {
             successRate = 0.0
         }
@@ -270,11 +283,11 @@ extension BackgroundTaskDataStore {
         // Count successful completions
         let successfulCompletions = completedEvents.filter { $0.success }.count
         
-        // Count explicit failures and unsuccessful completions
-        let explicitFailures = failedEvents.count + completedEvents.filter { !$0.success }.count
+        // Count execution failures (tasks that started execution but failed)
+        let executionFailures = failedEvents.count + completedEvents.filter { !$0.success }.count + expiredEvents.count
         
-        // Total failed includes failures, expired tasks, and cancelled tasks
-        let totalFailed = explicitFailures + expiredEvents.count + cancelledEvents.count
+        // Total failed includes execution failures AND cancelled tasks (for overall statistics)
+        let totalFailed = executionFailures + cancelledEvents.count
         
         // Calculate average duration from events with duration data
         let eventsWithDuration = completedEvents.filter { $0.duration != nil }
@@ -284,7 +297,9 @@ extension BackgroundTaskDataStore {
         // Success rate calculation: successful completions / total executed attempts
         let successRate: Double
         if totalExecuted > 0 {
-            successRate = Double(successfulCompletions) / Double(totalExecuted)
+            let rate = Double(successfulCompletions) / Double(totalExecuted)
+            // Ensure success rate is always between 0.0 and 1.0 (defensive programming)
+            successRate = min(max(rate, 0.0), 1.0)
         } else {
             successRate = 0.0
         }

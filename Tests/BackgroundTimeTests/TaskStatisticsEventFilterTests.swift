@@ -336,6 +336,184 @@ struct TaskStatisticsEventFilterTests {
         #expect(statistics.errorsByType.count >= 1, "Should categorize different error types")
     }
 
+    @Test("Success Rate Calculation With Cancelled Tasks")
+    func testSuccessRateCalculationWithCancelledTasks() async throws {
+        let customDefaults = UserDefaults(suiteName: "TaskStatisticsEventFilterTests.SuccessRate") ?? UserDefaults.standard
+        customDefaults.removePersistentDomain(forName: "TaskStatisticsEventFilterTests.SuccessRate")
+        let dataStore = BackgroundTaskDataStore(userDefaults: customDefaults)
+        
+        // Create a scenario with more cancelled tasks than executed tasks
+        let events = [
+            // 1 successful execution
+            createTestEvent(taskId: "success-task", type: .taskScheduled, success: true),
+            createTestEvent(taskId: "success-task", type: .taskExecutionStarted, success: true),
+            createTestEvent(taskId: "success-task", type: .taskExecutionCompleted, success: true),
+            
+            // 1 failed execution
+            createTestEvent(taskId: "failed-task", type: .taskScheduled, success: true),
+            createTestEvent(taskId: "failed-task", type: .taskExecutionStarted, success: true),
+            createTestEvent(taskId: "failed-task", type: .taskFailed, success: false),
+            
+            // 5 cancelled tasks (never executed)
+            createTestEvent(taskId: "cancelled-1", type: .taskScheduled, success: true),
+            createTestEvent(taskId: "cancelled-1", type: .taskCancelled, success: false),
+            createTestEvent(taskId: "cancelled-2", type: .taskScheduled, success: true),
+            createTestEvent(taskId: "cancelled-2", type: .taskCancelled, success: false),
+            createTestEvent(taskId: "cancelled-3", type: .taskScheduled, success: true),
+            createTestEvent(taskId: "cancelled-3", type: .taskCancelled, success: false),
+            createTestEvent(taskId: "cancelled-4", type: .taskCancelled, success: false),
+            createTestEvent(taskId: "cancelled-5", type: .taskCancelled, success: false),
+        ]
+        
+        for event in events {
+            dataStore.recordEvent(event)
+        }
+        
+        let statistics = dataStore.generateStatistics()
+        
+        // Verify counts
+        #expect(statistics.totalTasksScheduled == 5, "Should count 5 scheduled tasks")
+        #expect(statistics.totalTasksExecuted == 2, "Should count 2 executed tasks (not cancelled ones)")
+        #expect(statistics.totalTasksCompleted == 1, "Should count 1 completed task")
+        #expect(statistics.totalTasksFailed == 6, "Should count 1 failed + 5 cancelled = 6 total failures")
+        
+        // Verify success rate is calculated correctly and never exceeds 100%
+        // Expected: 1 successful completion / 2 executed tasks = 50%
+        #expect(statistics.successRate >= 0.0, "Success rate should never be negative")
+        #expect(statistics.successRate <= 1.0, "Success rate should never exceed 100% - got \(statistics.successRate * 100)%")
+        #expect(abs(statistics.successRate - 0.5) < 0.001, 
+               "Success rate should be 50% (1/2), got \(statistics.successRate * 100)%")
+        
+        // Verify that cancelled tasks don't affect the success rate calculation
+        // (only executed tasks should be considered for success rate)
+        let expectedSuccessRate = 1.0 / 2.0 // 1 success out of 2 executed
+        #expect(abs(statistics.successRate - expectedSuccessRate) < 0.001,
+               "Success rate should only consider executed tasks, not cancelled ones")
+    }
+
+    @Test("Success Rate Edge Cases")
+    func testSuccessRateEdgeCases() async throws {
+        let customDefaults = UserDefaults(suiteName: "TaskStatisticsEventFilterTests.SuccessRateEdges") ?? UserDefaults.standard
+        customDefaults.removePersistentDomain(forName: "TaskStatisticsEventFilterTests.SuccessRateEdges")
+        let dataStore = BackgroundTaskDataStore(userDefaults: customDefaults)
+        
+        // Test case 1: Only cancelled tasks (no executions)
+        let cancelledOnlyEvents = [
+            createTestEvent(taskId: "cancelled-1", type: .taskCancelled, success: false),
+            createTestEvent(taskId: "cancelled-2", type: .taskCancelled, success: false),
+            createTestEvent(taskId: "cancelled-3", type: .taskCancelled, success: false),
+        ]
+        
+        for event in cancelledOnlyEvents {
+            dataStore.recordEvent(event)
+        }
+        
+        let stats1 = dataStore.generateStatistics()
+        #expect(stats1.successRate == 0.0, "Success rate should be 0% when no tasks executed")
+        #expect(stats1.totalTasksExecuted == 0, "Should have 0 executed tasks")
+        #expect(stats1.totalTasksFailed == 3, "Should count 3 cancelled tasks as failures")
+        
+        // Clear and test case 2: All successful executions
+        dataStore.clearAllEvents()
+        
+        let successfulEvents = [
+            createTestEvent(taskId: "success-1", type: .taskExecutionStarted, success: true),
+            createTestEvent(taskId: "success-1", type: .taskExecutionCompleted, success: true),
+            createTestEvent(taskId: "success-2", type: .taskExecutionStarted, success: true),
+            createTestEvent(taskId: "success-2", type: .taskExecutionCompleted, success: true),
+        ]
+        
+        for event in successfulEvents {
+            dataStore.recordEvent(event)
+        }
+        
+        let stats2 = dataStore.generateStatistics()
+        #expect(stats2.successRate == 1.0, "Success rate should be 100% when all tasks succeed")
+        #expect(stats2.totalTasksExecuted == 2, "Should have 2 executed tasks")
+        #expect(stats2.totalTasksCompleted == 2, "Should have 2 completed tasks")
+        #expect(stats2.totalTasksFailed == 0, "Should have 0 failed tasks")
+    }
+
+    @Test("Success Rate Never Exceeds 100 Percent")
+    func testSuccessRateNeverExceeds100Percent() async throws {
+        let customDefaults = UserDefaults(suiteName: "TaskStatisticsEventFilterTests.SuccessRateBounds") ?? UserDefaults.standard
+        customDefaults.removePersistentDomain(forName: "TaskStatisticsEventFilterTests.SuccessRateBounds")
+        let dataStore = BackgroundTaskDataStore(userDefaults: customDefaults)
+        
+        // Test various edge cases that might cause success rate issues
+        
+        // Case 1: More successful completions than executions (data inconsistency)
+        let problematicEvents1 = [
+            createTestEvent(taskId: "task-1", type: .taskExecutionCompleted, success: true),
+            createTestEvent(taskId: "task-2", type: .taskExecutionCompleted, success: true),
+            // Only 1 execution started but 2 completions - this should be handled gracefully
+            createTestEvent(taskId: "task-1", type: .taskExecutionStarted, success: true),
+        ]
+        
+        for event in problematicEvents1 {
+            dataStore.recordEvent(event)
+        }
+        
+        var statistics = dataStore.generateStatistics()
+        #expect(statistics.successRate >= 0.0, "Success rate should never be negative")
+        #expect(statistics.successRate <= 1.0, "Success rate should never exceed 100% (got \(statistics.successRate * 100)%)")
+        
+        // Clear and test Case 2: Completion events with no execution started events
+        dataStore.clearAllEvents()
+        
+        let problematicEvents2 = [
+            createTestEvent(taskId: "completion-only-1", type: .taskExecutionCompleted, success: true),
+            createTestEvent(taskId: "completion-only-2", type: .taskExecutionCompleted, success: true),
+            createTestEvent(taskId: "completion-only-3", type: .taskExecutionCompleted, success: false),
+        ]
+        
+        for event in problematicEvents2 {
+            dataStore.recordEvent(event)
+        }
+        
+        statistics = dataStore.generateStatistics()
+        #expect(statistics.successRate >= 0.0, "Success rate should never be negative")
+        #expect(statistics.successRate <= 1.0, "Success rate should never exceed 100% (got \(statistics.successRate * 100)%)")
+        
+        // In this case: totalExecuted should be 3 (from completion events), successfulCompletions should be 2
+        // Success rate should be 2/3 = ~66.7%
+        #expect(statistics.totalTasksExecuted == 3, "Should count execution attempts from completion events")
+        #expect(abs(statistics.successRate - (2.0/3.0)) < 0.01, 
+               "Success rate should be ~66.7% (2/3), got \(statistics.successRate * 100)%")
+        
+        // Clear and test Case 3: Mix of different event types with potential edge cases
+        dataStore.clearAllEvents()
+        
+        let problematicEvents3 = [
+            // Normal execution
+            createTestEvent(taskId: "normal", type: .taskExecutionStarted, success: true),
+            createTestEvent(taskId: "normal", type: .taskExecutionCompleted, success: true),
+            
+            // Failed execution
+            createTestEvent(taskId: "failed", type: .taskExecutionStarted, success: true),
+            createTestEvent(taskId: "failed", type: .taskFailed, success: false),
+            
+            // Completion without execution started (edge case)
+            createTestEvent(taskId: "edge-case", type: .taskExecutionCompleted, success: true),
+            
+            // Cancelled task (should not affect success rate)
+            createTestEvent(taskId: "cancelled", type: .taskCancelled, success: false),
+        ]
+        
+        for event in problematicEvents3 {
+            dataStore.recordEvent(event)
+        }
+        
+        statistics = dataStore.generateStatistics()
+        #expect(statistics.successRate >= 0.0, "Success rate should never be negative")
+        #expect(statistics.successRate <= 1.0, "Success rate should never exceed 100% (got \(statistics.successRate * 100)%)")
+        
+        // Expected: 3 executed (2 started + 1 completion-only), 2 successful completions
+        // Success rate should be 2/3 = ~66.7%
+        #expect(statistics.totalTasksExecuted >= 2, "Should count at least 2 execution attempts")
+        print("Final test - Executed: \(statistics.totalTasksExecuted), Success Rate: \(statistics.successRate * 100)%")
+    }
+
     // MARK: - Edge Cases Tests
     
     @Test("Empty Data Set With Filtering")
