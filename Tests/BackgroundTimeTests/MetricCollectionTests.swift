@@ -373,7 +373,7 @@ struct MetricPerformanceTests {
         // Test aggregation performance
         let startTime = CFAbsoluteTimeGetCurrent()
         
-        let aggregationService = await MetricAggregationService.shared
+        let aggregationService = MetricAggregationService.shared
         let report = await aggregationService.generateDailyReport(for: baseDate)
         
         let aggregationDuration = CFAbsoluteTimeGetCurrent() - startTime

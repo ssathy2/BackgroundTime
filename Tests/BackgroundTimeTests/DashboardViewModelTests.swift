@@ -254,7 +254,7 @@ struct DashboardViewModelTests {
         #expect(viewModel.events.count == 2, "Should filter to recent events (task + app events)")
         
         // But statistics should only include task statistics events
-        if let statistics = viewModel.statistics {
+        if viewModel.statistics != nil {
             let statisticsEvents = viewModel.events.filter { $0.type.isTaskStatisticsEvent }
             #expect(statisticsEvents.count == 1, "Statistics should only include task-related events")
             #expect(statisticsEvents.first?.taskIdentifier == "recent-task", "Should contain only task statistics event")
@@ -267,7 +267,7 @@ struct DashboardViewModelTests {
         #expect(viewModel.events.count == 3, "Should contain all events for 'all' time range")
         
         // But statistics should only count task statistics events
-        if let statistics = viewModel.statistics {
+        if viewModel.statistics != nil {
             let allStatisticsEvents = viewModel.events.filter { $0.type.isTaskStatisticsEvent }
             #expect(allStatisticsEvents.count == 2, "Should have 2 task statistics events across all time")
         }
@@ -442,7 +442,7 @@ struct DashboardViewModelTests {
             #expect(firstItem.taskIdentifier == "task-2", "First item should be most recent")
             #expect(firstItem.eventType == .taskExpired, "Should preserve event type")
         } else {
-            #expect(false, "There should be elements in timelineData")
+            #expect(Bool(false), "There should be elements in timelineData")
         }
     }
     

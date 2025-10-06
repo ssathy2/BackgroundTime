@@ -413,7 +413,7 @@ struct SuccessRateTests {
         #expect(abs(statistics.successRate - 0.5) < 0.001, "Success rate should be 50% (0.5), got \(statistics.successRate)")
         
         // Verify that non-task events are not affecting the success rate calculation
-        let expectedExecutionsByHour = Dictionary(grouping: taskStatisticsEvents.filter { $0.type == .taskExecutionStarted }) { event in
+        let _ = Dictionary(grouping: taskStatisticsEvents.filter { $0.type == .taskExecutionStarted }) { event in
             Calendar.current.component(.hour, from: event.timestamp)
         }.mapValues { $0.count }
         

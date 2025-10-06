@@ -133,7 +133,7 @@ struct TimeRangeFilteringTests {
     func testViewModelTimeRangeFiltering() async throws {
         // Create isolated data store and view model
         let dataStore = BackgroundTaskDataStore.createTestInstance()
-        let viewModel = await DashboardViewModel()
+        let _ = await DashboardViewModel()
         
         // Create unique task identifiers for this test
         let testPrefix = "viewmodel_test_\(UUID().uuidString.prefix(8))_"

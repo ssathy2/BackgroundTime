@@ -46,8 +46,9 @@ struct SDKTests {
     @Test("BackgroundTime SDK singleton behavior")
     func testBackgroundTimeSingleton() async throws {
         // Test singleton behavior - should always return the same instance
-        let instance1 = BackgroundTime.shared
-        let instance2 = BackgroundTime.shared
+        let (instance1, instance2) = await MainActor.run {
+            (BackgroundTime.shared, BackgroundTime.shared)
+        }
         
         // Use Objective-C identity comparison since we can't use === in Swift Testing
         let ptr1 = Unmanaged.passUnretained(instance1).toOpaque()
@@ -57,7 +58,7 @@ struct SDKTests {
     
     @Test("BackgroundTime SDK initialization with default configuration")
     func testBackgroundTimeInitializationDefault() async throws {
-        let sdk = BackgroundTime.shared
+        let sdk = await MainActor.run { BackgroundTime.shared }
         
         // Test initialization with default configuration
         let defaultConfig = BackgroundTimeConfiguration.default
@@ -100,7 +101,7 @@ struct SDKTests {
     
     @Test("BackgroundTime SDK initialization with custom configuration")
     func testBackgroundTimeInitializationCustom() async throws {
-        let sdk = BackgroundTime.shared
+        let sdk = await MainActor.run { BackgroundTime.shared }
         
         // Test initialization with custom configuration
         let customURL = URL(string: "https://api.example.com/v1")!
@@ -120,7 +121,7 @@ struct SDKTests {
         
         // The configuration should be reflected in the SDK behavior
         let stats = await MainActor.run { sdk.getCurrentStats() }
-        #expect(stats.generatedAt != nil, "Statistics should have generation timestamp")
+        #expect(stats.generatedAt.timeIntervalSinceReferenceDate > 0, "Statistics should have generation timestamp")
         
         let events = await MainActor.run { sdk.getAllEvents() }
         #expect(events.count >= initialEventCount, "Should maintain events after custom initialization")
@@ -128,7 +129,7 @@ struct SDKTests {
     
     @Test("BackgroundTime SDK dashboard data export")
     func testDashboardDataExport() async throws {
-        let sdk = BackgroundTime.shared
+        let sdk = await MainActor.run { BackgroundTime.shared }
         
         // Initialize SDK with a custom configuration to ensure clean state
         let testConfig = BackgroundTimeConfiguration(
@@ -172,13 +173,13 @@ struct SDKTests {
         // Verify all components of dashboard data
         #expect(dashboardData.statistics.totalTasksScheduled >= 0, "Should have statistics with valid scheduled count")
         #expect(dashboardData.statistics.totalTasksExecuted >= 0, "Should have statistics with valid executed count")
-        #expect(dashboardData.statistics.generatedAt != nil, "Statistics should have generation timestamp")
+        #expect(dashboardData.statistics.generatedAt.timeIntervalSinceReferenceDate > 0, "Statistics should have generation timestamp")
         
         #expect(dashboardData.events.count >= 1, "Should have at least one event (initialization)")
         #expect(dashboardData.timeline.count >= 0, "Should have timeline array")
         #expect(dashboardData.systemInfo.deviceModel.count > 0, "Should have system info with device model")
         #expect(dashboardData.systemInfo.systemVersion.count > 0, "Should have system info with system version")
-        #expect(dashboardData.generatedAt != nil, "Dashboard data should have generation timestamp")
+        #expect(dashboardData.generatedAt.timeIntervalSinceReferenceDate > 0, "Dashboard data should have generation timestamp")
         
         // Verify timeline data structure
         if dashboardData.timeline.isEmpty {
@@ -187,7 +188,7 @@ struct SDKTests {
         } else {
             // If timeline has entries, they should all be valid
             for (index, timelinePoint) in dashboardData.timeline.enumerated() {
-                #expect(timelinePoint.timestamp != nil, "Timeline point \(index) should have timestamp")
+                #expect(timelinePoint.timestamp.timeIntervalSinceReferenceDate > 0, "Timeline point \(index) should have timestamp")
                 #expect(timelinePoint.taskIdentifier.count > 0, 
                         "Timeline point \(index) should have non-empty task identifier. Found: '\(timelinePoint.taskIdentifier)', event type: \(timelinePoint.eventType.rawValue)")
             }
@@ -217,7 +218,7 @@ struct SDKTests {
     
     @Test("BackgroundTime SDK performance metrics")
     func testSDKPerformanceMetrics() async throws {
-        let sdk = BackgroundTime.shared
+        let sdk = await MainActor.run { BackgroundTime.shared }
         
         // Initialize SDK
         await MainActor.run {
@@ -247,7 +248,7 @@ struct SDKTests {
     
     @Test("BackgroundTime SDK dashboard sync error handling")
     func testDashboardSyncErrorHandling() async throws {
-        let sdk = BackgroundTime.shared
+        let sdk = await MainActor.run { BackgroundTime.shared }
         
         // Initialize SDK with no endpoint configured
         let configWithoutEndpoint = BackgroundTimeConfiguration(
@@ -286,13 +287,13 @@ struct SDKTests {
             // If it succeeds, that's fine too
         } catch {
             // Expected to fail in test environment - just verify it doesn't crash
-            #expect(error != nil, "Should handle network errors gracefully")
+            #expect(type(of: error) != Never.self, "Should handle network errors gracefully")
         }
     }
     
     @Test("BackgroundTime SDK statistics consistency")
     func testSDKStatisticsConsistency() async throws {
-        let sdk = BackgroundTime.shared
+        let sdk = await MainActor.run { BackgroundTime.shared }
         
         // Initialize SDK
         await MainActor.run {
@@ -330,7 +331,7 @@ struct SDKTests {
         
         // Verify all events are accessible
         let allEvents = await MainActor.run { sdk.getAllEvents() }
-        let eventsFromStats = stats1.totalTasksScheduled + stats1.totalTasksExecuted + 
+        let _ = stats1.totalTasksScheduled + stats1.totalTasksExecuted + 
                             stats1.totalTasksCompleted + stats1.totalTasksFailed + stats1.totalTasksExpired
         
         // The total events might be more than the sum because some events might not fit these categories
@@ -339,7 +340,7 @@ struct SDKTests {
     
     @Test("BackgroundTime SDK event recording and retrieval")  
     func testSDKEventRecordingAndRetrieval() async throws {
-        let sdk = BackgroundTime.shared
+        let sdk = await MainActor.run { BackgroundTime.shared }
         
         // Initialize SDK - this should record an initialization event
         await MainActor.run {
@@ -372,7 +373,7 @@ struct SDKTests {
             // Check if metadata exists - it might be empty in some test environments
             if mostRecentInitEvent.metadata.keys.count > 0 {
                 // Verify metadata contains expected keys if present
-                if let version = mostRecentInitEvent.metadata["version"] as? String {
+                if let version = mostRecentInitEvent.metadata["version"] {
                     #expect(version == BackgroundTimeConfiguration.sdkVersion, "Should have correct SDK version in metadata")
                 }
             }
@@ -396,8 +397,8 @@ struct SDKTests {
         #expect(dashboardData.timeline.count <= dashboardData.events.count + 10, "Timeline should be reasonable compared to events")
         
         // Verify dashboard data structure is valid
-        #expect(dashboardData.statistics.generatedAt != nil, "Statistics should have generation timestamp")
+        #expect(dashboardData.statistics.generatedAt.timeIntervalSinceReferenceDate > 0, "Statistics should have generation timestamp")
         #expect(dashboardData.systemInfo.deviceModel.count > 0, "System info should be populated")
-        #expect(dashboardData.generatedAt != nil, "Dashboard data should have generation timestamp")
+        #expect(dashboardData.generatedAt.timeIntervalSinceReferenceDate > 0, "Dashboard data should have generation timestamp")
     }
 }

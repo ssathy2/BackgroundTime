@@ -95,7 +95,7 @@ struct NetworkManagerTests {
             // If it somehow succeeds, that's fine
         } catch {
             // Expected to fail due to invalid endpoint
-            #expect(error != nil, "Should handle network errors gracefully")
+            #expect(type(of: error) != Never.self, "Should handle network errors gracefully")
         }
         
         // Clean up singleton state
@@ -131,7 +131,7 @@ struct NetworkManagerTests {
             // If it somehow succeeds, that's fine
         } catch {
             // Expected to fail due to invalid endpoint
-            #expect(error != nil, "Should handle network errors gracefully")
+            #expect(type(of: error) != Never.self, "Should handle network errors gracefully")
         }
         
         // Clean up singleton state
@@ -195,7 +195,7 @@ struct NetworkManagerTests {
         #expect(dashboardData.timeline.count > 0, "Should have mock timeline data")
         #expect(dashboardData.statistics.totalTasksScheduled >= 0, "Should have valid statistics")
         #expect(dashboardData.systemInfo.deviceModel.count > 0, "Should have system info")
-        #expect(dashboardData.generatedAt != nil, "Should have generation timestamp")
+        #expect(dashboardData.generatedAt.timeIntervalSinceReferenceDate > 0, "Should have generation timestamp")
         
         // Test JSON encoding of dashboard data
         let encoder = JSONEncoder()

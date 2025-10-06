@@ -61,14 +61,14 @@ struct BGTaskSchedulerSwizzlerTests {
             try scheduler.submit(appRefreshRequest)
         } catch {
             // Expected to fail in test environment
-            #expect(error is Error, "Task submission should handle errors gracefully")
+            #expect(type(of: error) != Never.self, "Task submission should handle errors gracefully")
         }
         
         do {
             try scheduler.submit(processingRequest)
         } catch {
             // Expected to fail in test environment
-            #expect(error is Error, "Processing task submission should handle errors gracefully")
+            #expect(type(of: error) != Never.self, "Processing task submission should handle errors gracefully")
         }
         
         #expect(true, "Task submission attempts should complete without crashing")

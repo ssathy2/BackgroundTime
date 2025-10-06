@@ -54,18 +54,18 @@ struct DashboardSuccessRateTests {
         #expect(abs(stats.successRate - 0.75) < 0.001, "Success rate should be 75% (0.75)")
         
         // Create the overview tab view and verify it can be instantiated
-        let overviewTab = OverviewTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
-        #expect(overviewTab is OverviewTabView, "Overview tab should be created successfully")
+        let _ = OverviewTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
+        #expect(true, "Overview tab should be created successfully")
         
         // Create a StatisticCard for success rate to verify it displays the right format
-        let successRateCard = StatisticCard(
+        let _ = StatisticCard(
             title: "Success Rate",
             value: String(format: "%.1f%%", stats.successRate * 100),
             icon: "checkmark.circle.fill",
             color: .green
         )
         
-        #expect(successRateCard is StatisticCard, "Success rate card should be created")
+        #expect(true, "Success rate card should be created")
         
         // Verify the formatted value is correct
         let expectedValue = "75.0%"
@@ -132,13 +132,13 @@ struct DashboardSuccessRateTests {
         }
         
         // Create performance tab view and verify it can be instantiated
-        let performanceTab = PerformanceTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
-        #expect(performanceTab is PerformanceTabView, "Performance tab should be created successfully")
+        let _ = PerformanceTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
+        #expect(true, "Performance tab should be created successfully")
         
         // Test TaskMetricCard creation with different success rates
         for taskMetric in viewModel.taskMetrics {
-            let taskCard = TaskMetricCard(metric: taskMetric)
-            #expect(taskCard is TaskMetricCard, "Task metric card should be created for \(taskMetric.taskIdentifier)")
+            let _ = TaskMetricCard(metric: taskMetric)
+            #expect(true, "Task metric card should be created for \(taskMetric.taskIdentifier)")
             
             // Verify success rate formatting
             let formattedRate = String(format: "%.1f%%", taskMetric.successRate * 100)

@@ -78,7 +78,7 @@ struct DashboardTests {
     
     @Test("StatisticCard Component")
     func testStatisticCardComponent() async throws {
-        let card = StatisticCard(
+        let _ = StatisticCard(
             title: "Test Metric",
             value: "42",
             icon: "checkmark.circle.fill",
@@ -86,15 +86,14 @@ struct DashboardTests {
         )
         
         // Test that component can be created
-        #expect(card is StatisticCard, "StatisticCard should be created successfully")
+        #expect(true, "StatisticCard should be created successfully")
     }
     
     @Test("RecentEventsView Component")
     func testRecentEventsViewComponent() async throws {
         let testEvents = createTestEventsForView(count: 3)
-        let recentEventsView = RecentEventsView(events: testEvents)
-        
-        #expect(recentEventsView is RecentEventsView, "RecentEventsView should be created successfully")
+        let _ = RecentEventsView(events: testEvents)
+        #expect(true, "RecentEventsView should be created successfully")
     }
     
     @Test("TimelineRowView Component")
@@ -107,11 +106,11 @@ struct DashboardTests {
             success: true
         )
         
-        let timelineRow = TimelineRowView(dataPoint: dataPoint, isLast: false)
-        #expect(timelineRow is TimelineRowView, "TimelineRowView should be created successfully")
+        let _ = TimelineRowView(dataPoint: dataPoint, isLast: false)
+        #expect(true, "TimelineRowView should be created successfully")
         
-        let lastTimelineRow = TimelineRowView(dataPoint: dataPoint, isLast: true)
-        #expect(lastTimelineRow is TimelineRowView, "Last TimelineRowView should be created successfully")
+        let _ = TimelineRowView(dataPoint: dataPoint, isLast: true)
+        #expect(true, "Last TimelineRowView should be created successfully")
     }
     
     @Test("TaskMetricCard Component")
@@ -127,16 +126,15 @@ struct DashboardTests {
             lastExecutionDate: Date()
         )
         
-        let metricCard = TaskMetricCard(metric: metric)
-        #expect(metricCard is TaskMetricCard, "TaskMetricCard should be created successfully")
+        let _ = TaskMetricCard(metric: metric)
+        #expect(true, "TaskMetricCard should be created successfully")
     }
     
     @Test("ErrorEventCard Component")
     func testErrorEventCardComponent() async throws {
         let errorEvent = createTestEventsForView(count: 1).first!
-        let errorCard = ErrorEventCard(event: errorEvent)
-        
-        #expect(errorCard is ErrorEventCard, "ErrorEventCard should be created successfully")
+        let _ = ErrorEventCard(event: errorEvent)
+        #expect(true, "ErrorEventCard should be created successfully")
     }
     
     // MARK: - Tab View Tests
@@ -144,33 +142,29 @@ struct DashboardTests {
     @Test("OverviewTabView Component")
     func testOverviewTabViewComponent() async throws {
         let viewModel = DashboardViewModel()
-        let overviewTab = OverviewTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
-        
-        #expect(overviewTab is OverviewTabView, "OverviewTabView should be created successfully")
+        let _ = OverviewTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
+        #expect(true, "OverviewTabView should be created successfully")
     }
     
     @Test("TimelineTabView Component")
     func testTimelineTabViewComponent() async throws {
         let viewModel = DashboardViewModel()
-        let timelineTab = TimelineTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
-        
-        #expect(timelineTab is TimelineTabView, "TimelineTabView should be created successfully")
+        let _ = TimelineTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
+        #expect(true, "TimelineTabView should be created successfully")
     }
     
     @Test("PerformanceTabView Component")
     func testPerformanceTabViewComponent() async throws {
         let viewModel = DashboardViewModel()
-        let performanceTab = PerformanceTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
-        
-        #expect(performanceTab is PerformanceTabView, "PerformanceTabView should be created successfully")
+        let _ = PerformanceTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
+        #expect(true, "PerformanceTabView should be created successfully")
     }
     
     @Test("ErrorsTabView Component")
     func testErrorsTabViewComponent() async throws {
         let viewModel = DashboardViewModel()
-        let errorsTab = ErrorsTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
-        
-        #expect(errorsTab is ErrorsTabView, "ErrorsTabView should be created successfully")
+        let _ = ErrorsTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
+        #expect(true, "ErrorsTabView should be created successfully")
     }
     
     // MARK: - Continuous Tasks Tab Tests (iOS 26.0+)
@@ -179,9 +173,8 @@ struct DashboardTests {
     @available(iOS 26.0, *)
     func testContinuousTasksTabViewComponent() async throws {
         let viewModel = DashboardViewModel()
-        let continuousTab = ContinuousTasksTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
-        
-        #expect(continuousTab is ContinuousTasksTabView, "ContinuousTasksTabView should be created successfully")
+        let _ = ContinuousTasksTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
+        #expect(true, "ContinuousTasksTabView should be created successfully")
     }
     
     @Test("ContinuousTaskRow Component")
@@ -192,8 +185,8 @@ struct DashboardTests {
             createTestEventForView(taskId: "continuous-1", type: .continuousTaskProgress),
         ]
         
-        let taskRow = ContinuousTaskRow(taskIdentifier: "continuous-1", events: events)
-        #expect(taskRow is ContinuousTaskRow, "ContinuousTaskRow should be created successfully")
+        let _ = ContinuousTaskRow(taskIdentifier: "continuous-1", events: events)
+        #expect(true, "ContinuousTaskRow should be created successfully")
     }
     
     @Test("ContinuousTaskPerformanceCard Component")
@@ -204,8 +197,8 @@ struct DashboardTests {
             createTestEventForView(taskId: "continuous-1", type: .continuousTaskResumed, duration: 5.0),
         ]
         
-        let performanceCard = ContinuousTaskPerformanceCard(taskIdentifier: "continuous-1", events: events)
-        #expect(performanceCard is ContinuousTaskPerformanceCard, "ContinuousTaskPerformanceCard should be created successfully")
+        let _ = ContinuousTaskPerformanceCard(taskIdentifier: "continuous-1", events: events)
+        #expect(true, "ContinuousTaskPerformanceCard should be created successfully")
     }
     
     @Test("ContinuousTaskDisplayStatus")
@@ -263,27 +256,26 @@ struct DashboardTests {
     
     @Test("PerformanceKPICard Component")
     func testPerformanceKPICardComponent() async throws {
-        let kpiCard = PerformanceKPICard(
+        let _ = PerformanceKPICard(
             title: "Test KPI",
             value: "95.5%",
             trend: .improving,
             icon: "checkmark.circle.fill"
         )
         
-        #expect(kpiCard is PerformanceKPICard, "PerformanceKPICard should be created successfully")
+        #expect(true, "PerformanceKPICard should be created successfully")
     }
     
     @Test("LiveMetricGauge Component")
     func testLiveMetricGaugeComponent() async throws {
-        let gauge = LiveMetricGauge(
+        let _ = LiveMetricGauge(
             title: "CPU Usage",
             value: 45.0,
             maxValue: 100.0,
             unit: "%",
             color: .blue
         )
-        
-        #expect(gauge is LiveMetricGauge, "LiveMetricGauge should be created successfully")
+        #expect(true, "LiveMetricGauge should be created successfully")
     }
     
     @Test("EnhancedTaskMetricCard Component")
@@ -299,11 +291,10 @@ struct DashboardTests {
             lastExecutionDate: Date()
         )
         
-        let enhancedCard = EnhancedTaskMetricCard(metric: metric) {
+        let _ = EnhancedTaskMetricCard(metric: metric) {
             // Mock tap action
         }
-        
-        #expect(enhancedCard is EnhancedTaskMetricCard, "EnhancedTaskMetricCard should be created successfully")
+        #expect(true, "EnhancedTaskMetricCard should be created successfully")
     }
     
     @Test("PerformanceInsight Types")
@@ -341,8 +332,8 @@ struct DashboardTests {
             actionable: true
         )
         
-        let insightCard = PerformanceInsightCard(insight: insight)
-        #expect(insightCard is PerformanceInsightCard, "PerformanceInsightCard should be created successfully")
+        let _ = PerformanceInsightCard(insight: insight)
+        #expect(true, "PerformanceInsightCard should be created successfully")
     }
     
     // MARK: - Event Type Extension Tests
@@ -396,20 +387,20 @@ struct DashboardTests {
     
     @Test("MetricRow Component")
     func testMetricRowComponent() async throws {
-        let metricRow = MetricRow(label: "Test Metric", value: "100")
-        #expect(metricRow is MetricRow, "MetricRow should be created successfully")
+        let _ = MetricRow(label: "Test Metric", value: "100")
+        #expect(true, "MetricRow should be created successfully")
     }
     
     @Test("LegendItem Component")
     func testLegendItemComponent() async throws {
-        let legendItem = LegendItem(color: .blue, text: "Test Legend")
-        #expect(legendItem is LegendItem, "LegendItem should be created successfully")
+        let _ = LegendItem(color: .blue, text: "Test Legend")
+        #expect(true, "LegendItem should be created successfully")
     }
     
     @Test("MetricItem Component")
     func testMetricItemComponent() async throws {
-        let metricItem = MetricItem(label: "Test", value: "42", color: .green)
-        #expect(metricItem is MetricItem, "MetricItem should be created successfully")
+        let _ = MetricItem(label: "Test", value: "42", color: .green)
+        #expect(true, "MetricItem should be created successfully")
     }
     
     // MARK: - Error Summary Section Tests
@@ -422,8 +413,8 @@ struct DashboardTests {
             "System Error": 2
         ]
         
-        let errorSummary = ErrorsTabView.ErrorSummarySection(errorsByType: errorsByType)
-        #expect(errorSummary is ErrorsTabView.ErrorSummarySection, "ErrorSummarySection should be created successfully")
+        let _ = ErrorsTabView.ErrorSummarySection(errorsByType: errorsByType)
+        #expect(true, "ErrorSummarySection should be created successfully")
     }
     
     // MARK: - Detail View Tests
@@ -431,12 +422,12 @@ struct DashboardTests {
     @Test("DetailedTaskPerformanceView Component")
     func testDetailedTaskPerformanceViewComponent() async throws {
         let viewModel = DashboardViewModel()
-        let detailView = DetailedTaskPerformanceView(
+        let _ = DetailedTaskPerformanceView(
             taskIdentifier: "test-task",
             viewModel: viewModel
         )
-        
-        #expect(detailView is DetailedTaskPerformanceView, "DetailedTaskPerformanceView should be created successfully")
+    
+        #expect(true, "DetailedTaskPerformanceView should be created successfully")
     }
     
     // MARK: - Integration Tests
@@ -444,10 +435,10 @@ struct DashboardTests {
     @Test("Dashboard with Mock Data Integration")
     func testDashboardWithMockDataIntegration() async throws {
         // Create dashboard
-        let dashboard = BackgroundTimeDashboard()
+        let _ = BackgroundTimeDashboard()
         
         // Test that dashboard handles empty state gracefully
-        #expect(dashboard is BackgroundTimeDashboard, "Dashboard should handle empty state")
+        #expect(true, "Dashboard should handle empty state")
     }
     
     @Test("Tab Switching Integration")
@@ -472,8 +463,8 @@ struct DashboardTests {
         #expect(viewModel.events.isEmpty, "Should have no events initially")
         
         // Create views that depend on loading state
-        let overviewTab = OverviewTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
-        #expect(overviewTab is OverviewTabView, "Should create overview tab with initial state")
+        let _ = OverviewTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
+        #expect(true, "Should create overview tab with initial state")
     }
     
     @Test("Dashboard Error States")
@@ -482,8 +473,8 @@ struct DashboardTests {
         await viewModel.simulateError("Test error")
         
         // Test that views can handle error states
-        let overviewTab = OverviewTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
-        #expect(overviewTab is OverviewTabView, "Should create overview tab with error state")
+        let _ = OverviewTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
+        #expect(true, "Should create overview tab with error state")
         #expect(viewModel.error != nil, "Should have error state")
     }
     
@@ -502,14 +493,12 @@ struct DashboardTests {
     
     @Test("Large Data Rendering Performance")
     func testLargeDataRenderingPerformance() async throws {
-        let viewModel = DashboardViewModel()
-        
         // Simulate large dataset
         let largeEventList = createTestEventsForView(count: 1000)
         
         // Test that view components can handle large datasets
-        let recentEventsView = RecentEventsView(events: Array(largeEventList.prefix(100)))
-        #expect(recentEventsView is RecentEventsView, "Should handle large event lists")
+        let _ = RecentEventsView(events: Array(largeEventList.prefix(100)))
+        #expect(true, "Should handle large event lists")
         
         // Test timeline with many items
         let timelineData = largeEventList.map { event in
@@ -530,12 +519,12 @@ struct DashboardTests {
     @Test("Empty Data Edge Cases")
     func testEmptyDataEdgeCases() async throws {
         // Test components with empty data
-        let emptyEventsView = RecentEventsView(events: [])
-        #expect(emptyEventsView is RecentEventsView, "Should handle empty events list")
+        let _ = RecentEventsView(events: [])
+        #expect(true, "Should handle empty events list")
         
         let emptyErrorsByType: [String: Int] = [:]
-        let emptyErrorSummary = ErrorsTabView.ErrorSummarySection(errorsByType: emptyErrorsByType)
-        #expect(emptyErrorSummary is ErrorsTabView.ErrorSummarySection, "Should handle empty errors")
+        let _ = ErrorsTabView.ErrorSummarySection(errorsByType: emptyErrorsByType)
+        #expect(true, "Should handle empty errors")
     }
     
     @Test("Invalid Data Edge Cases")
@@ -552,8 +541,8 @@ struct DashboardTests {
             lastExecutionDate: Date.distantPast
         )
         
-        let metricCard = TaskMetricCard(metric: extremeMetric)
-        #expect(metricCard is TaskMetricCard, "Should handle extreme metric values gracefully")
+        let _ = TaskMetricCard(metric: extremeMetric)
+        #expect(true, "Should handle extreme metric values gracefully")
     }
 }
 
