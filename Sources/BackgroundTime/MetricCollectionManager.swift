@@ -156,9 +156,9 @@ import Darwin
         }
         
         // Clean up monitoring
-        performanceMonitor.stopMonitoring(for: identifier)
-        systemResourceMonitor.stopMonitoring(for: identifier)
-        networkMonitor.stopMonitoring(for: identifier)
+        _ = performanceMonitor.stopMonitoring(for: identifier)
+        _ = systemResourceMonitor.stopMonitoring(for: identifier)
+        _ = networkMonitor.stopMonitoring(for: identifier)
         taskSchedulingTimes.removeValue(forKey: identifier)
         
         logger.info("Recorded task expiration for: \(identifier)")
@@ -582,8 +582,8 @@ private class SystemResourceMonitor {
             logger.warning("Low battery condition: \(Int(metrics.batteryLevel * 100))%")
         }
         
-        if metrics.thermalState == .critical || metrics.thermalState == .serious {
-            logger.warning("High thermal state: \(Self.thermalStateToString(metrics.thermalState))")
+        if metrics.thermalState.thermalState == .critical || metrics.thermalState.thermalState == .serious {
+            logger.warning("High thermal state: \(Self.thermalStateToString(metrics.thermalState.thermalState))")
         }
     }
     
@@ -592,7 +592,7 @@ private class SystemResourceMonitor {
             batteryLevel: getBatteryLevel(),
             isCharging: getBatteryState() == .charging,
             isLowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
-            thermalState: ProcessInfo.processInfo.thermalState,
+            thermalState: CodableThermalState(ProcessInfo.processInfo.thermalState),
             availableMemoryPercentage: getAvailableMemoryPercentage(),
             diskSpaceAvailable: getAvailableDiskSpace()
         )
@@ -658,7 +658,7 @@ private class SystemMonitoringSession {
             batteryLevel: getBatteryLevel(),
             isCharging: getBatteryState() == .charging,
             isLowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
-            thermalState: ProcessInfo.processInfo.thermalState,
+            thermalState: CodableThermalState(ProcessInfo.processInfo.thermalState),
             availableMemoryPercentage: getAvailableMemoryPercentage(),
             diskSpaceAvailable: getAvailableDiskSpace()
         )

@@ -56,7 +56,7 @@ struct MetricCollectionTests {
             batteryLevel: 0.75,
             isCharging: true,
             isLowPowerModeEnabled: false,
-            thermalState: .nominal,
+            thermalState: CodableThermalState(.nominal),
             availableMemoryPercentage: 60.0,
             diskSpaceAvailable: 5_000_000_000 // 5GB
         )
@@ -150,18 +150,18 @@ struct MetricCollectionTests {
         #expect(networkCategorization.isRetryable == true)
     }
     
-    @Test("ProcessInfo ThermalState Codable")
+    @Test("CodableThermalState Codable")
     func testThermalStateCodable() async throws {
-        let originalState = ProcessInfo.ThermalState.serious
+        let originalState = CodableThermalState(.serious)
         
         let encoder = JSONEncoder()
         let data = try encoder.encode(originalState)
         
         let decoder = JSONDecoder()
-        let decodedState = try decoder.decode(ProcessInfo.ThermalState.self, from: data)
+        let decodedState = try decoder.decode(CodableThermalState.self, from: data)
         
-        #expect(decodedState == originalState)
-        #expect(decodedState.rawValue == 2) // serious = 2
+        #expect(decodedState.thermalState == originalState.thermalState)
+        #expect(decodedState.thermalState.rawValue == 2) // serious = 2
     }
 }
 

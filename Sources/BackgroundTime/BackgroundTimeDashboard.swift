@@ -138,12 +138,12 @@ public struct BackgroundTimeDashboard: View {
                 }
             }
         }
-        .onChange(of: selectedTimeRange) { newRange in
+        .onChange(of: selectedTimeRange) { _, newRange in
             Task { @MainActor in
                 await viewModel.loadData(for: newRange)
             }
         }
-        .onChange(of: viewModel.error) { newError in
+        .onChange(of: viewModel.error) { _, newError in
             showingError = newError != nil
         }
     }
@@ -152,7 +152,7 @@ public struct BackgroundTimeDashboard: View {
         VStack(spacing: 8) {
             Picker("Time Range", selection: $selectedTimeRange) {
                 ForEach(TimeRange.allCases, id: \.self) { range in
-                    Text(range.displayName).tag(range)
+                    Text(range.shortDisplayName).tag(range)
                 }
             }
             .pickerStyle(SegmentedPickerStyle())
@@ -1344,7 +1344,7 @@ struct ContinuousTaskRow: View {
             }
             
             // Progress indicator if available
-            if let progressEvent = events.filter({ $0.type == .continuousTaskProgress }).last {
+            if events.contains(where: { $0.type == .continuousTaskProgress }) {
                 ProgressView(value: 0.7) // Placeholder - you'd extract actual progress from metadata
                     .progressViewStyle(LinearProgressViewStyle())
                     .frame(height: 4)

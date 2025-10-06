@@ -332,7 +332,7 @@ struct BGTaskSwizzlerTests {
         if let completionEvent = completionEvents.last {
             #expect(completionEvent.success == true, "Event should be marked as successful")
             #expect(completionEvent.errorMessage == nil, "Should not have error message for success")
-            #expect(completionEvent.metadata["completion_success"] as? String == "true", "Should have success metadata")
+            #expect(completionEvent.metadata["completion_success"] == "true", "Should have success metadata")
             #expect(completionEvent.metadata["task_type"] != nil, "Should have task type metadata")
             #expect(completionEvent.duration != nil, "Should have calculated duration")
             
@@ -390,7 +390,7 @@ struct BGTaskSwizzlerTests {
         if let completionEvent = completionEvents.last {
             #expect(completionEvent.success == false, "Event should be marked as failure")
             #expect(completionEvent.errorMessage?.contains("failure") == true, "Should have failure error message")
-            #expect(completionEvent.metadata["completion_success"] as? String == "false", "Should have failure metadata")
+            #expect(completionEvent.metadata["completion_success"] == "false", "Should have failure metadata")
             #expect(completionEvent.duration != nil, "Should have calculated duration")
         }
     }
@@ -704,7 +704,7 @@ extension BGTaskSwizzler {
         // Record the start time directly and synchronously for testing
         // Use MainActor to ensure we're on the right context
         await MainActor.run {
-            Task {
+            _ = Task {
                 await BGTaskSwizzler.taskStartTimesManager.setStartTime(startTime, for: task.identifier)
             }
         }

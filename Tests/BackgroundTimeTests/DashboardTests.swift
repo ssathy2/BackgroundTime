@@ -22,7 +22,7 @@ struct DashboardTests {
         let dashboard = BackgroundTimeDashboard()
         
         // Test that dashboard can be created without issues
-        #expect(dashboard is BackgroundTimeDashboard, "Dashboard should initialize successfully")
+        #expect(type(of: dashboard) == BackgroundTimeDashboard.self, "Dashboard should initialize successfully")
     }
     
     // MARK: - Dashboard Tab Tests

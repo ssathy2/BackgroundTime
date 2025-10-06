@@ -368,6 +368,58 @@ struct SuccessRateTests {
         }
     }
     
+    @Test("Success Rate Excludes Non-Task Statistics Events")
+    func testSuccessRateExcludesNonTaskStatisticsEvents() async throws {
+        let customDefaults = UserDefaults(suiteName: "SuccessRateTests.FilteringEvents") ?? UserDefaults.standard
+        customDefaults.removePersistentDomain(forName: "SuccessRateTests.FilteringEvents")
+        let dataStore = BackgroundTaskDataStore(userDefaults: customDefaults)
+        
+        // Create a mix of task statistics events and non-statistics events
+        let events = [
+            // Task statistics events (should be counted)
+            createTestEvent(taskId: "task-1", type: .taskExecutionStarted, success: true),
+            createTestEvent(taskId: "task-1", type: .taskExecutionCompleted, success: true, duration: 2.0),
+            createTestEvent(taskId: "task-2", type: .taskExecutionStarted, success: true),
+            createTestEvent(taskId: "task-2", type: .taskExecutionCompleted, success: false, duration: 1.0),
+            
+            // Non-task statistics events (should be excluded from statistics)
+            createTestEvent(taskId: "sdk", type: .initialization, success: true),
+            createTestEvent(taskId: "app", type: .appEnteredBackground, success: true),
+            createTestEvent(taskId: "app", type: .appWillEnterForeground, success: true),
+        ]
+        
+        for event in events {
+            dataStore.recordEvent(event)
+        }
+        
+        let statistics = dataStore.generateStatistics()
+        
+        // Verify that only task statistics events are counted
+        let allEvents = dataStore.getAllEvents()
+        #expect(allEvents.count == 7, "Should store all events")
+        
+        let taskStatisticsEvents = allEvents.filter { $0.type.isTaskStatisticsEvent }
+        #expect(taskStatisticsEvents.count == 4, "Should identify 4 task statistics events")
+        
+        let nonTaskStatisticsEvents = allEvents.filter { !$0.type.isTaskStatisticsEvent }
+        #expect(nonTaskStatisticsEvents.count == 3, "Should identify 3 non-task statistics events")
+        
+        // Statistics should only reflect task statistics events
+        #expect(statistics.totalTasksExecuted == 2, "Should count only task executions, not app lifecycle events")
+        #expect(statistics.totalTasksCompleted == 2, "Should count only task completions")
+        #expect(statistics.totalTasksFailed == 1, "Should count only task failures")
+        
+        // Expected success rate: 1 successful / 2 executed = 0.5 (50%)
+        #expect(abs(statistics.successRate - 0.5) < 0.001, "Success rate should be 50% (0.5), got \(statistics.successRate)")
+        
+        // Verify that non-task events are not affecting the success rate calculation
+        let expectedExecutionsByHour = Dictionary(grouping: taskStatisticsEvents.filter { $0.type == .taskExecutionStarted }) { event in
+            Calendar.current.component(.hour, from: event.timestamp)
+        }.mapValues { $0.count }
+        
+        #expect(statistics.executionsByHour.values.reduce(0, +) == 2, "Executions by hour should only count task executions")
+    }
+    
     // MARK: - Aggregation Report Tests
     
     @Test("Aggregation Report Success Rate Calculation")

@@ -64,7 +64,7 @@ public struct SystemResourceMetrics: Codable {
     public let batteryLevel: Float
     public let isCharging: Bool
     public let isLowPowerModeEnabled: Bool
-    public let thermalState: ProcessInfo.ThermalState
+    public let thermalState: CodableThermalState
     public let availableMemoryPercentage: Double
     public let diskSpaceAvailable: Int64
     
@@ -82,7 +82,7 @@ public struct SystemResourceMetrics: Codable {
     }
     
     private var thermalStateString: String {
-        switch thermalState {
+        switch thermalState.thermalState {
         case .nominal: return "nominal"
         case .fair: return "fair"
         case .serious: return "serious"
@@ -573,23 +573,31 @@ public struct ErrorMetricsSummary: Codable {
 
 // MARK: - Extensions
 
-extension ProcessInfo.ThermalState: Codable {
+// MARK: - Thermal State Wrapper (to avoid conformance conflicts)
+
+public struct CodableThermalState: Codable {
+    public let thermalState: ProcessInfo.ThermalState
+    
+    public init(_ thermalState: ProcessInfo.ThermalState) {
+        self.thermalState = thermalState
+    }
+    
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let rawValue = try container.decode(Int.self)
         
         switch rawValue {
-        case 0: self = .nominal
-        case 1: self = .fair
-        case 2: self = .serious
-        case 3: self = .critical
-        default: self = .nominal
+        case 0: self.thermalState = .nominal
+        case 1: self.thermalState = .fair
+        case 2: self.thermalState = .serious
+        case 3: self.thermalState = .critical
+        default: self.thermalState = .nominal
         }
     }
     
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
-        try container.encode(self.rawValue)
+        try container.encode(thermalState.rawValue)
     }
 }
 

@@ -15,7 +15,7 @@ import UIKit
 /// Provides comprehensive reporting capabilities for task performance, system metrics, and error analysis.
 /// This service is thread-safe and can be used from any context.
 public final class MetricAggregationService: Sendable {
-    nonisolated(unsafe) public static let shared = MetricAggregationService()
+    public static let shared = MetricAggregationService()
     
     private let logger = Logger(subsystem: "BackgroundTime", category: "MetricAggregation")
     private let dataStore = BackgroundTaskDataStore.shared
@@ -74,24 +74,30 @@ public final class MetricAggregationService: Sendable {
     // MARK: - Task Metrics Summary
     
     private func generateTaskMetricsSummary(from events: [BackgroundTaskEvent]) -> TaskMetricsSummary {
-        let scheduledEvents = events.filter { $0.type == .taskScheduled }
-        let executedEvents = events.filter { $0.type == .taskExecutionStarted }
-        let completedEvents = events.filter { $0.type == .taskExecutionCompleted && $0.success }
-        let failedEvents = events.filter { $0.type == .taskFailed || ($0.type == .taskExecutionCompleted && !$0.success) }
-        let expiredEvents = events.filter { $0.type == .taskExpired }
+        // Filter to only include events that should be counted in task statistics
+        // This excludes app lifecycle events (initialization, appEnteredBackground, appWillEnterForeground)
+        // but includes all task-related events including continuous task events on iOS 26.0+
+        let statisticsEvents = events.filter { $0.type.isTaskStatisticsEvent }
+        
+        let scheduledEvents = statisticsEvents.filter { $0.type == .taskScheduled }
+        let executedEvents = statisticsEvents.filter { $0.type == .taskExecutionStarted }
+        let completedEvents = statisticsEvents.filter { $0.type == .taskExecutionCompleted && $0.success }
+        let failedEvents = statisticsEvents.filter { $0.type == .taskFailed || ($0.type == .taskExecutionCompleted && !$0.success) }
+        let expiredEvents = statisticsEvents.filter { $0.type == .taskExpired }
         
         let executionDurations = completedEvents.compactMap { $0.duration }
         let averageExecutionDuration = executionDurations.isEmpty ? 0 : 
             executionDurations.reduce(0, +) / Double(executionDurations.count)
         
         let schedulingLatencies = executedEvents.compactMap { event -> TimeInterval? in
-            guard let latency = event.metadata["scheduling_latency"] as? TimeInterval else { return nil }
+            guard let latencyString = event.metadata["scheduling_latency"],
+                  let latency = Double(latencyString) else { return nil }
             return latency
         }
         let averageSchedulingLatency = schedulingLatencies.isEmpty ? 0 :
             schedulingLatencies.reduce(0, +) / Double(schedulingLatencies.count)
         
-        let successRate = executedEvents.count > 0 ? 
+        _ = executedEvents.count > 0 ? 
             Double(completedEvents.count) / Double(executedEvents.count) : 0
         
         let executionTimeDistribution = Dictionary(grouping: executionDurations) { duration in
@@ -123,15 +129,17 @@ public final class MetricAggregationService: Sendable {
         }
         
         let cpuUsages = performanceEvents.compactMap { event -> Double? in
-            event.metadata["performance_cpu_usage_percentage"] as? Double
+            guard let cpuString = event.metadata["performance_cpu_usage_percentage"] else { return nil }
+            return Double(cpuString)
         }
         
         let memoryUsages = performanceEvents.compactMap { event -> Int64? in
-            event.metadata["performance_peak_memory_usage"] as? Int64
+            guard let memoryString = event.metadata["performance_peak_memory_usage"] else { return nil }
+            return Int64(memoryString)
         }
         
         let energyImpacts = performanceEvents.compactMap { event -> EnergyImpact? in
-            guard let rawValue = event.metadata["performance_energy_impact"] as? String else { return nil }
+            guard let rawValue = event.metadata["performance_energy_impact"] else { return nil }
             return EnergyImpact(rawValue: rawValue)
         }
         
@@ -173,18 +181,19 @@ public final class MetricAggregationService: Sendable {
         let lowPowerModeActivations = systemInfos.filter { $0.lowPowerModeEnabled }.count
         
         let thermalStates = events.compactMap { event -> String? in
-            event.metadata["system_thermal_state"] as? String
+            event.metadata["system_thermal_state"]
         }
         let thermalStateDistribution = Dictionary(grouping: thermalStates, by: { $0 })
             .mapValues { $0.count }
         
         let memoryStatuses = events.compactMap { event -> String? in
-            event.metadata["system_memory_status"] as? String
+            event.metadata["system_memory_status"]
         }
         let memoryPressureEvents = memoryStatuses.filter { $0 == "low" || $0 == "critical" }.count
         
         let diskSpaceEvents = events.compactMap { event -> Int64? in
-            event.metadata["system_disk_space_available"] as? Int64
+            guard let diskSpaceString = event.metadata["system_disk_space_available"] else { return nil }
+            return Int64(diskSpaceString)
         }
         let diskSpaceCriticalEvents = diskSpaceEvents.filter { $0 < 1_000_000_000 }.count // Less than 1GB
         
@@ -223,42 +232,46 @@ public final class MetricAggregationService: Sendable {
         }
         
         let requestCounts = networkEvents.compactMap { event -> Int? in
-            event.metadata["network_request_count"] as? Int
+            guard let countString = event.metadata["network_request_count"] else { return nil }
+            return Int(countString)
         }
         let totalNetworkRequests = requestCounts.reduce(0, +)
         
         let bytesTransferred = networkEvents.compactMap { event -> Int64? in
-            event.metadata["network_total_bytes_transferred"] as? Int64
+            guard let bytesString = event.metadata["network_total_bytes_transferred"] else { return nil }
+            return Int64(bytesString)
         }
         let totalDataTransferred = bytesTransferred.reduce(0, +)
         
         let latencies = networkEvents.compactMap { event -> TimeInterval? in
-            event.metadata["network_average_latency"] as? TimeInterval
+            guard let latencyString = event.metadata["network_average_latency"] else { return nil }
+            return Double(latencyString)
         }
         let averageLatency = latencies.isEmpty ? 0 : latencies.reduce(0, +) / Double(latencies.count)
         
         let connectionFailures = networkEvents.compactMap { event -> Int? in
-            event.metadata["network_connection_failures"] as? Int
+            guard let failuresString = event.metadata["network_connection_failures"] else { return nil }
+            return Int(failuresString)
         }
         let totalFailures = connectionFailures.reduce(0, +)
         let connectionFailureRate = totalNetworkRequests > 0 ? 
             Double(totalFailures) / Double(totalNetworkRequests) : 0
         
         let reliabilityCategories = networkEvents.compactMap { event -> String? in
-            event.metadata["network_reliability_category"] as? String
+            event.metadata["network_reliability_category"]
         }
         let reliabilityDistribution = Dictionary(grouping: reliabilityCategories, by: { $0 })
             .mapValues { $0.count }
         
         let dataUsageCategories = networkEvents.compactMap { event -> String? in
-            event.metadata["network_data_usage_category"] as? String
+            event.metadata["network_data_usage_category"]
         }
         let dataUsageDistribution = Dictionary(grouping: dataUsageCategories, by: { $0 })
             .mapValues { $0.count }
         
         // Calculate network unavailable time from events that failed due to network issues
         let networkFailureEvents = events.filter { event in
-            guard let errorCategory = event.metadata["error_category"] as? String else { return false }
+            guard let errorCategory = event.metadata["error_category"] else { return false }
             return errorCategory == "network"
         }
         let networkUnavailableTime = networkFailureEvents.compactMap { $0.duration }.reduce(0, +)
@@ -280,32 +293,32 @@ public final class MetricAggregationService: Sendable {
         let errorEvents = events.filter { !$0.success || $0.errorMessage != nil }
         
         let errorCategories = errorEvents.compactMap { event -> String? in
-            event.metadata["error_category"] as? String
+            event.metadata["error_category"]
         }
         let errorCategoryDistribution = Dictionary(grouping: errorCategories, by: { $0 })
             .mapValues { $0.count }
         
         let errorSeverities = errorEvents.compactMap { event -> String? in
-            event.metadata["error_severity"] as? String
+            event.metadata["error_severity"]
         }
         let errorSeverityDistribution = Dictionary(grouping: errorSeverities, by: { $0 })
             .mapValues { $0.count }
         
         let retryableErrors = errorEvents.filter { event in
             // This would be determined by the error categorization
-            guard let category = event.metadata["error_category"] as? String else { return false }
+            guard let category = event.metadata["error_category"] else { return false }
             return ["network", "timeout", "system", "quota"].contains(category)
         }
         let retryableErrorsCount = retryableErrors.count
         
         let criticalErrors = errorEvents.filter { event in
-            guard let severity = event.metadata["error_severity"] as? String else { return false }
+            guard let severity = event.metadata["error_severity"] else { return false }
             return severity == "critical"
         }
         let criticalErrorsCount = criticalErrors.count
         
         let errorCodes = errorEvents.compactMap { event -> String? in
-            event.metadata["error_code"] as? String
+            event.metadata["error_code"]
         }
         let mostCommonErrors = Dictionary(grouping: errorCodes, by: { $0 })
             .mapValues { $0.count }

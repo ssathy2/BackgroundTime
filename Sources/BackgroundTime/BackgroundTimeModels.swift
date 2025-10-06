@@ -40,6 +40,19 @@ public enum BackgroundTaskEventType: String, Codable, CaseIterable, Sendable {
         }
         return false
     }
+    
+    /// Returns true if this event type should be included in task statistics calculations
+    public var isTaskStatisticsEvent: Bool {
+        switch self {
+        case .taskScheduled, .taskExecutionStarted, .taskExecutionCompleted,
+             .taskExpired, .taskCancelled, .taskFailed,
+             .continuousTaskStarted, .continuousTaskPaused, .continuousTaskResumed,
+             .continuousTaskStopped, .continuousTaskProgress:
+            return true
+        case .initialization, .appEnteredBackground, .appWillEnterForeground:
+            return false
+        }
+    }
 }
 
 // MARK: - Background Task Event
@@ -362,6 +375,18 @@ public enum TimeRange: Codable, CaseIterable {
         case .last7Days: return "Last 7 Days" 
         case .last30Days: return "Last 30 Days"
         case .all: return "All Time"
+        }
+    }
+    
+    /// Short display name for use in segmented controls with limited space
+    public var shortDisplayName: String {
+        switch self {
+        case .last1Hour: return "1H"
+        case .last6Hours: return "6H"
+        case .last24Hours: return "24H"
+        case .last7Days: return "7D" 
+        case .last30Days: return "30D"
+        case .all: return "All"
         }
     }
 }

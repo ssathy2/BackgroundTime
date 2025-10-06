@@ -114,13 +114,17 @@ final class BackgroundTaskDataStore: @unchecked Sendable {
     }
     
     private func generateStatisticsInternal(from events: [BackgroundTaskEvent]) -> BackgroundTaskStatistics {
-        let totalScheduled = events.filter { $0.type == .taskScheduled }.count
+        // Filter to only include events that should be counted in statistics
+        let statisticsEvents = events.filter { $0.type.isTaskStatisticsEvent }
+        
+        let totalScheduled = statisticsEvents.filter { $0.type == .taskScheduled }.count
         
         // Count distinct task execution attempts by tracking unique task identifiers that started execution
-        let executionStartedEvents = events.filter { $0.type == .taskExecutionStarted }
-        let completionEvents = events.filter { $0.type == .taskExecutionCompleted }
-        let failedEvents = events.filter { $0.type == .taskFailed }
-        let expiredEvents = events.filter { $0.type == .taskExpired }
+        let executionStartedEvents = statisticsEvents.filter { $0.type == .taskExecutionStarted }
+        let completionEvents = statisticsEvents.filter { $0.type == .taskExecutionCompleted }
+        let failedEvents = statisticsEvents.filter { $0.type == .taskFailed }
+        let expiredEvents = statisticsEvents.filter { $0.type == .taskExpired }
+        let cancelledEvents = statisticsEvents.filter { $0.type == .taskCancelled }
         
         // Primary approach: Use execution started events if available
         let totalExecuted = !executionStartedEvents.isEmpty ? executionStartedEvents.count : completionEvents.count
@@ -136,8 +140,8 @@ final class BackgroundTaskDataStore: @unchecked Sendable {
         // Total completed includes both successful and failed completions (but not expired)
         let totalCompleted = completionEvents.count
         
-        // Total failed includes explicit failures and expired tasks
-        let totalFailed = explicitFailures + totalExpired
+        // Total failed includes explicit failures, expired tasks, and cancelled tasks
+        let totalFailed = explicitFailures + totalExpired + cancelledEvents.count
         
         // Calculate average execution time from completed events (successful or failed) with duration
         let eventsWithDuration = completionEvents.filter { $0.duration != nil }
@@ -158,11 +162,12 @@ final class BackgroundTaskDataStore: @unchecked Sendable {
             Calendar.current.component(.hour, from: event.timestamp)
         }.mapValues { $0.count }
         
-        // Group errors by type from failed events and unsuccessful completion events
-        let errorEvents = events.filter { 
+        // Group errors by type from failed, expired, cancelled events and unsuccessful completion events
+        let errorEvents = statisticsEvents.filter { 
             $0.type == .taskFailed || 
             ($0.type == .taskExecutionCompleted && !$0.success) ||
-            $0.type == .taskExpired
+            $0.type == .taskExpired ||
+            $0.type == .taskCancelled
         }
         let errorsByType = Dictionary(grouping: errorEvents) { event in
             event.errorMessage?.isEmpty == false ? event.errorMessage! : "Unknown Error"
@@ -248,13 +253,16 @@ extension BackgroundTaskDataStore {
     }
     
     private func generateTaskMetrics(for taskIdentifier: String, from taskEvents: [BackgroundTaskEvent]) -> TaskPerformanceMetrics? {
-        guard !taskEvents.isEmpty else { return nil }
+        // Filter to only include events that should be counted in task statistics
+        let statisticsEvents = taskEvents.filter { $0.type.isTaskStatisticsEvent }
+        guard !statisticsEvents.isEmpty else { return nil }
         
-        let scheduledEvents = taskEvents.filter { $0.type == .taskScheduled }
-        let executedEvents = taskEvents.filter { $0.type == .taskExecutionStarted }
-        let completedEvents = taskEvents.filter { $0.type == .taskExecutionCompleted }
-        let failedEvents = taskEvents.filter { $0.type == .taskFailed }
-        let expiredEvents = taskEvents.filter { $0.type == .taskExpired }
+        let scheduledEvents = statisticsEvents.filter { $0.type == .taskScheduled }
+        let executedEvents = statisticsEvents.filter { $0.type == .taskExecutionStarted }
+        let completedEvents = statisticsEvents.filter { $0.type == .taskExecutionCompleted }
+        let failedEvents = statisticsEvents.filter { $0.type == .taskFailed }
+        let expiredEvents = statisticsEvents.filter { $0.type == .taskExpired }
+        let cancelledEvents = statisticsEvents.filter { $0.type == .taskCancelled }
         
         // Use execution started events if available, otherwise infer from completion events
         let totalExecuted = !executedEvents.isEmpty ? executedEvents.count : completedEvents.count
@@ -265,8 +273,8 @@ extension BackgroundTaskDataStore {
         // Count explicit failures and unsuccessful completions
         let explicitFailures = failedEvents.count + completedEvents.filter { !$0.success }.count
         
-        // Total failed includes failures and expired tasks
-        let totalFailed = explicitFailures + expiredEvents.count
+        // Total failed includes failures, expired tasks, and cancelled tasks
+        let totalFailed = explicitFailures + expiredEvents.count + cancelledEvents.count
         
         // Calculate average duration from events with duration data
         let eventsWithDuration = completedEvents.filter { $0.duration != nil }
@@ -299,8 +307,10 @@ extension BackgroundTaskDataStore {
     
     func getDailyExecutionPattern() -> [DailyExecutionData] {
         let calendar = Calendar.current
-        let allEvents = getAllEvents() // Get events from the data store
-        let grouped = Dictionary(grouping: allEvents.filter { $0.type == .taskExecutionStarted }) { event in
+        let allEvents = getAllEvents()
+        // Filter to only include task statistics events for pattern analysis
+        let statisticsEvents = allEvents.filter { $0.type.isTaskStatisticsEvent }
+        let grouped = Dictionary(grouping: statisticsEvents.filter { $0.type == .taskExecutionStarted }) { event in
             calendar.startOfDay(for: event.timestamp)
         }
         

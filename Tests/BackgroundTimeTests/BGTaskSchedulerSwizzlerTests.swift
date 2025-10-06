@@ -23,9 +23,9 @@ struct BGTaskSchedulerSwizzlerTests {
             BGTaskSchedulerSwizzler.swizzleSchedulerMethods() // Should be safe to call multiple times
         }
         
-        // Verify BGTaskScheduler is still functional
+        // Verify BGTaskScheduler is accessible
         let scheduler = BGTaskScheduler.shared
-        #expect(scheduler != nil, "BGTaskScheduler should remain functional after swizzling")
+        #expect(type(of: scheduler) == BGTaskScheduler.self, "BGTaskScheduler should remain functional after swizzling")
         
         // Test that basic scheduler operations don't crash
         let testIdentifier = "swizzling-safety-test-\(UUID().uuidString)"
@@ -61,14 +61,14 @@ struct BGTaskSchedulerSwizzlerTests {
             try scheduler.submit(appRefreshRequest)
         } catch {
             // Expected to fail in test environment
-            #expect(error != nil, "Task submission should handle errors gracefully")
+            #expect(error is Error, "Task submission should handle errors gracefully")
         }
         
         do {
             try scheduler.submit(processingRequest)
         } catch {
             // Expected to fail in test environment
-            #expect(error != nil, "Processing task submission should handle errors gracefully")
+            #expect(error is Error, "Processing task submission should handle errors gracefully")
         }
         
         #expect(true, "Task submission attempts should complete without crashing")
@@ -162,8 +162,8 @@ struct BGTaskSchedulerSwizzlerTests {
         // Verify the task was recorded
         let recordedTime = await BGTaskSwizzler.taskStartTimesManager.getStartTime(for: testTaskId)
         
-        #expect(recordedTime != nil, "Task start time should have been recorded")
-        #expect(abs(recordedTime!.timeIntervalSince(testStartTime)) < 1.0, "Recorded time should be close to test time")
+        let unwrappedTime = try #require(recordedTime, "Task start time should have been recorded")
+        #expect(abs(unwrappedTime.timeIntervalSince(testStartTime)) < 1.0, "Recorded time should be close to test time")
         
         // Clean up test entry
         await BGTaskSwizzler.taskStartTimesManager.removeStartTime(for: testTaskId)
@@ -249,11 +249,11 @@ struct BGTaskSchedulerSwizzlerTests {
             
             // Should be parseable back to a date
             let parsedDate = formatter.date(from: iso8601String)
-            #expect(parsedDate != nil, "ISO8601 string should be parseable back to Date")
+            let unwrappedDate = try #require(parsedDate, "ISO8601 string should be parseable back to Date")
             
             // For normal dates (not distant past/future), should be very close
             if testDate != Date.distantPast && testDate != Date.distantFuture {
-                let timeDifference = abs(parsedDate!.timeIntervalSince(testDate))
+                let timeDifference = abs(unwrappedDate.timeIntervalSince(testDate))
                 #expect(timeDifference < 1.0, "Parsed date should be within 1 second of original")
             }
             

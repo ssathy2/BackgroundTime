@@ -70,6 +70,99 @@ struct DashboardViewModelTests {
         #expect(viewModel.selectedTimeRange == .last24Hours, "Should default to last 24 hours")
     }
     
+    // MARK: - Task Statistics Event Filtering Tests
+    
+    @Test("Task Statistics Event Filtering")
+    func testTaskStatisticsEventFiltering() async throws {
+        let (viewModel, dataStore) = createTestViewModel()
+        
+        // Create a mix of task statistics events and non-statistics events
+        var events = [
+            // Task statistics events
+            createTestEvent(taskId: "task-1", type: .taskScheduled),
+            createTestEvent(taskId: "task-1", type: .taskExecutionStarted),
+            createTestEvent(taskId: "task-1", type: .taskExecutionCompleted, duration: 2.0, success: true),
+            createTestEvent(taskId: "task-2", type: .taskFailed),
+            createTestEvent(taskId: "task-3", type: .taskExpired),
+            createTestEvent(taskId: "task-4", type: .taskCancelled),
+            
+            // Non-statistics events (should be excluded from statistics)
+            createTestEvent(taskId: "sdk", type: .initialization),
+            createTestEvent(taskId: "app", type: .appEnteredBackground),
+            createTestEvent(taskId: "app", type: .appWillEnterForeground),
+        ]
+        
+        // Add continuous task events if iOS 26.0+ is available
+        if #available(iOS 26.0, *) {
+            let continuousEvents = [
+                createTestEvent(taskId: "continuous-1", type: .continuousTaskStarted),
+                createTestEvent(taskId: "continuous-1", type: .continuousTaskProgress),
+                createTestEvent(taskId: "continuous-1", type: .continuousTaskPaused),
+                createTestEvent(taskId: "continuous-1", type: .continuousTaskResumed),
+                createTestEvent(taskId: "continuous-1", type: .continuousTaskStopped),
+            ]
+            events.append(contentsOf: continuousEvents)
+        }
+        
+        for event in events {
+            dataStore.recordEvent(event)
+        }
+        
+        await viewModel.loadData(for: .all)
+        
+        // All events should be loaded for display
+        let expectedTotalEvents: Int
+        if #available(iOS 26.0, *) {
+            expectedTotalEvents = 14
+        } else {
+            expectedTotalEvents = 9
+        }
+        #expect(viewModel.events.count == expectedTotalEvents, "Should load all events for display")
+        
+        // But statistics should only count task statistics events
+        let statisticsEvents = viewModel.events.filter { $0.type.isTaskStatisticsEvent }
+        let expectedStatisticsEvents: Int
+        if #available(iOS 26.0, *) {
+            expectedStatisticsEvents = 11
+        } else {
+            expectedStatisticsEvents = 6
+        }
+        #expect(statisticsEvents.count == expectedStatisticsEvents, "Should filter to only task statistics events")
+        
+        // Verify which events are included/excluded
+        let includedTypes = statisticsEvents.map { $0.type }
+        #expect(includedTypes.contains(.taskScheduled), "Should include task scheduled events")
+        #expect(includedTypes.contains(.taskExecutionStarted), "Should include task execution started events")
+        #expect(includedTypes.contains(.taskExecutionCompleted), "Should include task execution completed events")
+        #expect(includedTypes.contains(.taskFailed), "Should include task failed events")
+        #expect(includedTypes.contains(.taskExpired), "Should include task expired events")
+        #expect(includedTypes.contains(.taskCancelled), "Should include task cancelled events")
+        
+        if #available(iOS 26.0, *) {
+            #expect(includedTypes.contains(.continuousTaskStarted), "Should include continuous task started events")
+            #expect(includedTypes.contains(.continuousTaskProgress), "Should include continuous task progress events")
+            #expect(includedTypes.contains(.continuousTaskPaused), "Should include continuous task paused events")
+            #expect(includedTypes.contains(.continuousTaskResumed), "Should include continuous task resumed events")
+            #expect(includedTypes.contains(.continuousTaskStopped), "Should include continuous task stopped events")
+        }
+        
+        let excludedEvents = viewModel.events.filter { !$0.type.isTaskStatisticsEvent }
+        let excludedTypes = excludedEvents.map { $0.type }
+        #expect(excludedTypes.contains(.initialization), "Should exclude initialization events")
+        #expect(excludedTypes.contains(.appEnteredBackground), "Should exclude app entered background events")
+        #expect(excludedTypes.contains(.appWillEnterForeground), "Should exclude app will enter foreground events")
+        
+        // Verify that statistics calculations respect the filtering
+        if let statistics = viewModel.statistics {
+            // Statistics should only count task-related events
+            #expect(statistics.totalTasksScheduled == 1, "Should count only task scheduled events")
+            #expect(statistics.totalTasksExecuted == 1, "Should count only task execution events")
+            #expect(statistics.totalTasksCompleted == 1, "Should count only task completion events")
+            #expect(statistics.totalTasksFailed >= 2, "Should count failed and expired events")
+            #expect(statistics.totalTasksExpired == 1, "Should count expired events")
+        }
+    }
+    
     // MARK: - Data Loading Tests
     
     @Test("Load Data for Time Range")
@@ -132,7 +225,7 @@ struct DashboardViewModelTests {
         
         let now = Date()
         
-        // Create events at different times
+        // Create events at different times - using events that are included in task statistics
         let recentEvent = createTestEvent(
             taskId: "recent-task",
             timestamp: now.addingTimeInterval(-30 * 60), // 30 minutes ago (within last hour)
@@ -143,22 +236,41 @@ struct DashboardViewModelTests {
             timestamp: now.addingTimeInterval(-86400 * 2), // 2 days ago
             type: .taskExecutionCompleted
         )
+        // Add a non-statistics event that should be excluded from statistics computations
+        let appBackgroundEvent = createTestEvent(
+            taskId: "app-event",
+            timestamp: now.addingTimeInterval(-15 * 60), // 15 minutes ago
+            type: .appEnteredBackground
+        )
         
         dataStore.recordEvent(recentEvent)
         dataStore.recordEvent(oldEvent)
+        dataStore.recordEvent(appBackgroundEvent)
         
         // Load data for last hour
         await viewModel.loadData(for: .last1Hour)
         
-        // Should only contain recent event
-        #expect(viewModel.events.count == 1, "Should filter to recent events only")
-        #expect(viewModel.events.first?.taskIdentifier == "recent-task", "Should contain only recent task")
+        // Should contain both recent events (task and app events for display)
+        #expect(viewModel.events.count == 2, "Should filter to recent events (task + app events)")
+        
+        // But statistics should only include task statistics events
+        if let statistics = viewModel.statistics {
+            let statisticsEvents = viewModel.events.filter { $0.type.isTaskStatisticsEvent }
+            #expect(statisticsEvents.count == 1, "Statistics should only include task-related events")
+            #expect(statisticsEvents.first?.taskIdentifier == "recent-task", "Should contain only task statistics event")
+        }
         
         // Load data for all time
         await viewModel.loadData(for: .all)
         
-        // Should contain both events
-        #expect(viewModel.events.count == 2, "Should contain all events for 'all' time range")
+        // Should contain all events for display
+        #expect(viewModel.events.count == 3, "Should contain all events for 'all' time range")
+        
+        // But statistics should only count task statistics events
+        if let statistics = viewModel.statistics {
+            let allStatisticsEvents = viewModel.events.filter { $0.type.isTaskStatisticsEvent }
+            #expect(allStatisticsEvents.count == 2, "Should have 2 task statistics events across all time")
+        }
     }
     
     @Test("Error Handling During Data Loading")

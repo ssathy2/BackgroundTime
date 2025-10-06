@@ -275,7 +275,7 @@ struct TestControlsView: View {
                 
                 Button("Schedule Media Download") {
                     Task {
-                        await backgroundManager.scheduleMediaDownload()
+                        backgroundManager.scheduleMediaDownload()
                     }
                 }
             }
