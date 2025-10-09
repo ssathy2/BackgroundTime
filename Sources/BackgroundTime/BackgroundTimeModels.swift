@@ -220,6 +220,7 @@ public struct BackgroundTaskDashboardData: Codable, Sendable {
     public let events: [BackgroundTaskEvent]
     public let timeline: [TimelineDataPoint]
     public let systemInfo: SystemInfo
+    public let schedulingAnalyses: [TaskSchedulingAnalysis]
     public let generatedAt: Date
     
     public init(
@@ -227,12 +228,14 @@ public struct BackgroundTaskDashboardData: Codable, Sendable {
         events: [BackgroundTaskEvent],
         timeline: [TimelineDataPoint],
         systemInfo: SystemInfo,
+        schedulingAnalyses: [TaskSchedulingAnalysis] = [],
         generatedAt: Date = Date()
     ) {
         self.statistics = statistics
         self.events = events
         self.timeline = timeline
         self.systemInfo = systemInfo
+        self.schedulingAnalyses = schedulingAnalyses
         self.generatedAt = generatedAt
     }
 }

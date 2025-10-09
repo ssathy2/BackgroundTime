@@ -70,12 +70,14 @@ public final class BackgroundTime: ObservableObject {
         let stats = getCurrentStats()
         let events = getAllEvents()
         let timeline = generateTimelineData(from: events)
+        let schedulingAnalyses = analyzeAllTaskScheduling()
         
         return BackgroundTaskDashboardData(
             statistics: stats,
             events: events,
             timeline: timeline,
-            systemInfo: collectSystemInfo()
+            systemInfo: collectSystemInfo(),
+            schedulingAnalyses: schedulingAnalyses
         )
     }
     
@@ -87,6 +89,40 @@ public final class BackgroundTime: ObservableObject {
     /// Get buffer utilization statistics
     public func getBufferStatistics() -> BufferStatistics {
         return dataStore.getBufferStatistics()
+    }
+    
+    // MARK: - Task Scheduling Analysis
+    
+    /// Analyze scheduling patterns for a specific task identifier
+    /// This provides insights into how earliestBeginDate, network, and power requirements affect execution timing
+    public func analyzeTaskScheduling(for taskIdentifier: String) -> TaskSchedulingAnalysis? {
+        guard isInitialized else {
+            logger.warning("BackgroundTime not initialized - cannot analyze task scheduling")
+            return nil
+        }
+        
+        let analyzer = TaskSchedulingAnalyzer()
+        return analyzer.analyzeSchedulingPatterns(for: taskIdentifier)
+    }
+    
+    /// Analyze scheduling patterns for all tasks
+    /// Returns optimization insights for all tracked task identifiers
+    public func analyzeAllTaskScheduling() -> [TaskSchedulingAnalysis] {
+        guard isInitialized else {
+            logger.warning("BackgroundTime not initialized - cannot analyze task scheduling")
+            return []
+        }
+        
+        let analyzer = TaskSchedulingAnalyzer()
+        return analyzer.analyzeAllTasks()
+    }
+    
+    /// Get scheduling optimization recommendations for a specific task
+    public func getSchedulingRecommendations(for taskIdentifier: String) -> [SchedulingRecommendation] {
+        guard let analysis = analyzeTaskScheduling(for: taskIdentifier) else {
+            return []
+        }
+        return analysis.optimizationRecommendations
     }
     
     /// Record a test event (for testing purposes only)
