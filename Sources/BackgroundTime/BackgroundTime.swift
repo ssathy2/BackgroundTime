@@ -20,7 +20,6 @@ public final class BackgroundTime: ObservableObject {
     private let logger = Logger(subsystem: "BackgroundTime", category: "SDK")
     public private(set) var isInitialized = false
     private let dataStore = BackgroundTaskDataStore.shared
-    private let networkManager = NetworkManager.shared
     
     // Track swizzling status for debugging
     public private(set) var isSwizzlingEnabled = false
@@ -39,9 +38,6 @@ public final class BackgroundTime: ObservableObject {
         // Configure data store with thread-safe circular buffer
         dataStore.configure(maxStoredEvents: configuration.maxStoredEvents)
         
-        // Configure network manager
-        networkManager.configure(apiEndpoint: configuration.apiEndpoint)
-        
         // Setup method swizzling on main actor
         setupMethodSwizzling()
         
@@ -52,11 +48,10 @@ public final class BackgroundTime: ObservableObject {
         logger.info("BackgroundTime SDK initialized successfully")
         
         // Record initialization event
-        recordSDKEvent(.initialization, metadata: [
-            "version": BackgroundTimeConfiguration.sdkVersion,
-            "configuration": configuration.description,
-            "thread_safe_architecture": "enabled",
-            "circular_buffer_capacity": configuration.maxStoredEvents
+        recordSDKEvent(.metricKitDataReceived, metadata: [
+            "version": "1.0.0", // BackgroundTimeConfiguration.sdkVersion
+            "maxStoredEvents": configuration.maxStoredEvents,
+            "detailedLogging": configuration.enableDetailedLogging
         ])
     }
     
@@ -70,7 +65,7 @@ public final class BackgroundTime: ObservableObject {
         return dataStore.getAllEvents()
     }
     
-    /// Export data for web dashboard
+    /// Export data for dashboard display
     public func exportDataForDashboard() -> BackgroundTaskDashboardData {
         let stats = getCurrentStats()
         let events = getAllEvents()
@@ -84,12 +79,6 @@ public final class BackgroundTime: ObservableObject {
         )
     }
     
-    /// Send data to remote dashboard (if configured)
-    public func syncWithDashboard() async throws {
-        let dashboardData = exportDataForDashboard()
-        try await networkManager.uploadDashboardData(dashboardData)
-    }
-    
     /// Get data store performance metrics
     public func getDataStorePerformance() -> PerformanceReport {
         return dataStore.getDataStorePerformance()
@@ -98,6 +87,16 @@ public final class BackgroundTime: ObservableObject {
     /// Get buffer utilization statistics
     public func getBufferStatistics() -> BufferStatistics {
         return dataStore.getBufferStatistics()
+    }
+    
+    /// Record a test event (for testing purposes only)
+    /// This method should only be used in test environments
+    public func recordTestEvent(_ event: BackgroundTaskEvent) {
+        guard isInitialized else {
+            logger.warning("BackgroundTime not initialized - cannot record test event")
+            return
+        }
+        dataStore.recordEvent(event)
     }
     
     // MARK: - Private Methods
@@ -114,12 +113,6 @@ public final class BackgroundTime: ObservableObject {
         isSwizzlingEnabled = true
         
         logger.info("🔧 Method swizzling enabled successfully")
-        
-        // Record swizzling event
-        recordSDKEvent(.initialization, metadata: [
-            "swizzling_enabled": "true",
-            "swizzling_methods": "BGTaskScheduler.register, BGTask.setTaskCompleted"
-        ])
     }
     
     private func setupAppLifecycleMonitoring() {

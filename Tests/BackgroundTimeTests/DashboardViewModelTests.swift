@@ -87,7 +87,7 @@ struct DashboardViewModelTests {
             createTestEvent(taskId: "task-4", type: .taskCancelled),
             
             // Non-statistics events (should be excluded from statistics)
-            createTestEvent(taskId: "sdk", type: .initialization),
+            createTestEvent(taskId: "sdk", type: .metricKitDataReceived),
             createTestEvent(taskId: "app", type: .appEnteredBackground),
             createTestEvent(taskId: "app", type: .appWillEnterForeground),
         ]
@@ -148,7 +148,7 @@ struct DashboardViewModelTests {
         
         let excludedEvents = viewModel.events.filter { !$0.type.isTaskStatisticsEvent }
         let excludedTypes = excludedEvents.map { $0.type }
-        #expect(excludedTypes.contains(.initialization), "Should exclude initialization events")
+        #expect(excludedTypes.contains(.metricKitDataReceived), "Should exclude initialization events")
         #expect(excludedTypes.contains(.appEnteredBackground), "Should exclude app entered background events")
         #expect(excludedTypes.contains(.appWillEnterForeground), "Should exclude app will enter foreground events")
         
@@ -397,18 +397,6 @@ struct DashboardViewModelTests {
         #expect(exportedData.events.count >= 0, "Should export events data")
         #expect(exportedData.timeline.count >= 0, "Should export timeline data")
         #expect(exportedData.generatedAt <= Date(), "Should have valid generation timestamp")
-    }
-    
-    @Test("Sync with Dashboard")
-    func testSyncWithDashboard() async throws {
-        let (viewModel, _) = createTestViewModel()
-        
-        // Test sync (this will produce an error due to no API endpoint)
-        await viewModel.syncWithDashboard()
-        
-        // Verify error state is set for missing API endpoint
-        #expect(viewModel.error != nil, "Sync should produce error when no API endpoint is configured")
-        #expect(viewModel.error?.contains("No API endpoint configured") == true, "Error should mention missing API endpoint")
     }
     
     // MARK: - Timeline Data Tests

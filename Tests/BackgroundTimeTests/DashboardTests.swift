@@ -346,7 +346,7 @@ struct DashboardTests {
         #expect(BackgroundTaskEventType.taskExpired.icon == "clock.badge.exclamationmark", "Expired task should have correct icon")
         #expect(BackgroundTaskEventType.taskCancelled.icon == "xmark.circle.fill", "Cancelled task should have correct icon")
         #expect(BackgroundTaskEventType.taskFailed.icon == "exclamationmark.triangle.fill", "Failed task should have correct icon")
-        #expect(BackgroundTaskEventType.initialization.icon == "gear", "Initialization should have correct icon")
+        #expect(BackgroundTaskEventType.metricKitDataReceived.icon == "gear", "Initialization should have correct icon")
         #expect(BackgroundTaskEventType.appEnteredBackground.icon == "moon.fill", "Background should have correct icon")
         #expect(BackgroundTaskEventType.appWillEnterForeground.icon == "sun.max.fill", "Foreground should have correct icon")
         

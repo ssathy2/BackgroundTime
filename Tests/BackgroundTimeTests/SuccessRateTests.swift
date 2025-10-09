@@ -383,7 +383,7 @@ struct SuccessRateTests {
             createTestEvent(taskId: "task-2", type: .taskExecutionCompleted, success: false, duration: 1.0),
             
             // Non-task statistics events (should be excluded from statistics)
-            createTestEvent(taskId: "sdk", type: .initialization, success: true),
+            createTestEvent(taskId: "metrickit", type: .metricKitDataReceived, success: true),
             createTestEvent(taskId: "app", type: .appEnteredBackground, success: true),
             createTestEvent(taskId: "app", type: .appWillEnterForeground, success: true),
         ]

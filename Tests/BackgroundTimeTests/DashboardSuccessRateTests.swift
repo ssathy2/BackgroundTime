@@ -258,11 +258,11 @@ struct DashboardSuccessRateTests {
             createTestEvent(taskId: "recent-task-2", type: .taskExecutionCompleted, success: false, duration: 1.5,
                            timestamp: now.addingTimeInterval(-6 * 3600 + 1.5)),
             
-            // Events from 1 hour ago (should be included in last 24 hours)
+            // Events from ~30 minutes ago (should be included in last 1 hour)
             createTestEvent(taskId: "very-recent-task", type: .taskExecutionStarted, success: true,
-                           timestamp: now.addingTimeInterval(-3600)), // 1 hour ago
+                           timestamp: now.addingTimeInterval(-1800)), // 30 minutes ago
             createTestEvent(taskId: "very-recent-task", type: .taskExecutionCompleted, success: true, duration: 0.8,
-                           timestamp: now.addingTimeInterval(-3600 + 0.8))
+                           timestamp: now.addingTimeInterval(-1800 + 0.8))
         ]
         
         for event in events {
@@ -299,7 +299,7 @@ struct DashboardSuccessRateTests {
         
         guard let last1hStats = viewModel.statistics else { return }
         
-        // Should include only 1 task: 1 successful = 100% success rate
+        // Should include only 1 task (very-recent-task from 30 minutes ago): 1 successful = 100% success rate
         #expect(last1hStats.totalTasksExecuted == 1, "Should show 1 executed task in last hour")
         #expect(abs(last1hStats.successRate - 1.0) < 0.001,
                "Success rate for last hour should be 100%, got \(last1hStats.successRate)")

@@ -79,11 +79,18 @@ public final class MetricAggregationService: Sendable {
         // but includes all task-related events including continuous task events on iOS 26.0+
         let statisticsEvents = events.filter { $0.type.isTaskStatisticsEvent }
         
-        let scheduledEvents = statisticsEvents.filter { $0.type == .taskScheduled }
-        let executedEvents = statisticsEvents.filter { $0.type == .taskExecutionStarted }
-        let completedEvents = statisticsEvents.filter { $0.type == .taskExecutionCompleted && $0.success }
-        let failedEvents = statisticsEvents.filter { $0.type == .taskFailed || ($0.type == .taskExecutionCompleted && !$0.success) }
-        let expiredEvents = statisticsEvents.filter { $0.type == .taskExpired }
+        let scheduledEvents = statisticsEvents.filter { $0.type == BackgroundTaskEventType.taskScheduled }
+        let executedEvents = statisticsEvents.filter { $0.type == BackgroundTaskEventType.taskExecutionStarted }
+        let completedEvents = statisticsEvents.filter { $0.type == BackgroundTaskEventType.taskExecutionCompleted && $0.success }
+        
+        // Break up the complex expression for failed events
+        let taskFailedEvents = statisticsEvents.filter { $0.type == BackgroundTaskEventType.taskFailed }
+        let taskCompletedButFailedEvents = statisticsEvents.filter { 
+            $0.type == BackgroundTaskEventType.taskExecutionCompleted && !$0.success 
+        }
+        let failedEvents = taskFailedEvents + taskCompletedButFailedEvents
+        
+        let expiredEvents = statisticsEvents.filter { $0.type == BackgroundTaskEventType.taskExpired }
         
         let executionDurations = completedEvents.compactMap { $0.duration }
         let averageExecutionDuration = executionDurations.isEmpty ? 0 : 
@@ -97,7 +104,7 @@ public final class MetricAggregationService: Sendable {
         let averageSchedulingLatency = schedulingLatencies.isEmpty ? 0 :
             schedulingLatencies.reduce(0, +) / Double(schedulingLatencies.count)
         
-        _ = executedEvents.count > 0 ? 
+        let successRate = executedEvents.count > 0 ? 
             Double(completedEvents.count) / Double(executedEvents.count) : 0
         
         let executionTimeDistribution = Dictionary(grouping: executionDurations) { duration in

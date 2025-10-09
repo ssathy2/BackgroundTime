@@ -43,9 +43,10 @@ class DashboardViewModel: ObservableObject {
     }
     
     func loadData(for timeRange: TimeRange, forceReload: Bool = false) async {
-        // Don't reload if we're already showing this time range and not loading
-        // Note: We always reload for testing scenarios and when data might have changed
-        if currentTimeRange == timeRange && !isLoading && !initialLoad && !forceReload {
+        // Always reload when time range changes to ensure fresh data
+        let shouldReload = currentTimeRange != timeRange || forceReload || initialLoad
+        
+        if !shouldReload && !isLoading {
             return
         }
         
@@ -54,44 +55,72 @@ class DashboardViewModel: ObservableObject {
         isLoading = true
         error = nil
         
-        let endDate = Date()
-        let startDate = Date(timeIntervalSinceNow: -timeRange.timeInterval)
-        
-        // Load filtered events
-        let filteredEvents = dataStore.getEventsInDateRange(from: startDate, to: endDate)
-        
-        // Generate statistics based on filtered events
-        let stats = dataStore.generateStatistics(for: filteredEvents, in: startDate...endDate)
-        
-        // Generate timeline data
-        let timeline = filteredEvents.map { event in
-            TimelineDataPoint(
-                timestamp: event.timestamp,
-                eventType: event.type,
-                taskIdentifier: event.taskIdentifier,
-                duration: event.duration,
-                success: event.success
-            )
-        }.sorted(by: { $0.timestamp > $1.timestamp })
-        
-        // Generate task metrics for filtered events
-        let uniqueTaskIdentifiers = Set(filteredEvents.map { $0.taskIdentifier })
-        let metrics = uniqueTaskIdentifiers.compactMap { identifier in
-            dataStore.getTaskPerformanceMetrics(for: identifier, in: startDate...endDate)
-        }.sorted(by: { $0.taskIdentifier < $1.taskIdentifier })
-        
-        // Update UI (already on main actor)
-        self.statistics = stats
-        self.events = filteredEvents.sorted(by: { $0.timestamp > $1.timestamp })
-        self.timelineData = timeline
-        self.taskMetrics = metrics
-        
-        // Process continuous tasks data for iOS 26+
-        if #available(iOS 26.0, *) {
-            self.processContinuousTasksData(from: filteredEvents)
+        do {
+            // Calculate time range with proper date handling using extension
+            let timeInterval = selectedTimeRange.dateInterval
+            
+            // Debug logging for time range filtering
+            print("🕒 Time Range Filtering:")
+            print("   - \(selectedTimeRange.debugDescription)")
+            
+            // Load filtered events with precise date filtering
+            let filteredEvents = dataStore.getEventsInDateRange(from: timeInterval.start, to: timeInterval.end)
+            
+            print("  - Found \(filteredEvents.count) events in range")
+            if filteredEvents.count > 0 {
+                let timestamps = filteredEvents.map { $0.timestamp }.sorted()
+                if let earliest = timestamps.first, let latest = timestamps.last {
+                    print("  - Event range: \(earliest) to \(latest)")
+                }
+            }
+            
+            // Generate statistics based on filtered events
+            let stats = dataStore.generateStatistics(for: filteredEvents, in: timeInterval.start...timeInterval.end)
+            
+            // Generate timeline data with proper sorting
+            let timeline = filteredEvents.map { event in
+                TimelineDataPoint(
+                    timestamp: event.timestamp,
+                    eventType: event.type,
+                    taskIdentifier: event.taskIdentifier,
+                    duration: event.duration,
+                    success: event.success
+                )
+            }.sorted(by: { $0.timestamp > $1.timestamp }) // Most recent first
+            
+            // Generate task metrics for filtered events only
+            let uniqueTaskIdentifiers = Set(filteredEvents.map { $0.taskIdentifier })
+            let metrics = uniqueTaskIdentifiers.compactMap { identifier in
+                // Get events for this specific task within the time range
+                let taskEvents = filteredEvents.filter { $0.taskIdentifier == identifier }
+                return dataStore.generateTaskMetrics(for: identifier, from: taskEvents)
+            }.sorted(by: { $0.taskIdentifier < $1.taskIdentifier })
+            
+            // Update UI on main actor
+            await MainActor.run {
+                self.statistics = stats
+                self.events = filteredEvents.sorted(by: { $0.timestamp > $1.timestamp })
+                self.timelineData = timeline
+                self.taskMetrics = metrics
+                
+                // Process continuous tasks data for iOS 26+
+                if #available(iOS 26.0, *) {
+                    self.processContinuousTasksData(from: filteredEvents)
+                }
+                
+                self.isLoading = false
+                
+                // Log final results
+                print("  - Statistics: \(stats.totalTasksExecuted) executed, \(stats.totalTasksCompleted) completed")
+                print("  - Success Rate: \(String(format: "%.1f", stats.successRate * 100))%")
+            }
+            
+        } catch {
+            await MainActor.run {
+                self.error = "Failed to load data: \(error.localizedDescription)"
+                self.isLoading = false
+            }
         }
-        
-        self.isLoading = false
     }
     
     func refresh() async {
@@ -106,17 +135,7 @@ class DashboardViewModel: ObservableObject {
     func exportData() async -> BackgroundTaskDashboardData {
         return BackgroundTime.shared.exportDataForDashboard()
     }
-    
-    func syncWithDashboard() async {
-        do {
-            try await BackgroundTime.shared.syncWithDashboard()
-        } catch {
-            await MainActor.run {
-                self.error = "Sync failed: \(error.localizedDescription)"
-            }
-        }
-    }
-    
+
     // MARK: - Continuous Tasks Support (iOS 26.0+)
     
     @available(iOS 26.0, *)

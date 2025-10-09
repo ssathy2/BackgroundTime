@@ -30,8 +30,8 @@
             filePath = "BackgroundTimeExample/SocialMediaBackgroundManager.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "336"
-            endingLineNumber = "336"
+            startingLineNumber = "500"
+            endingLineNumber = "500"
             landmarkName = "scheduleMediaDownload()"
             landmarkType = "7">
          </BreakpointContent>
@@ -62,8 +62,8 @@
             filePath = "BackgroundTimeExample/SocialMediaBackgroundManager.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "322"
-            endingLineNumber = "322"
+            startingLineNumber = "486"
+            endingLineNumber = "486"
             landmarkName = "scheduleChatSyncTask()"
             landmarkType = "7">
          </BreakpointContent>
@@ -78,8 +78,8 @@
             filePath = "BackgroundTimeExample/SocialMediaBackgroundManager.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "310"
-            endingLineNumber = "310"
+            startingLineNumber = "474"
+            endingLineNumber = "474"
             landmarkName = "scheduleAppRefreshTask()"
             landmarkType = "7">
          </BreakpointContent>

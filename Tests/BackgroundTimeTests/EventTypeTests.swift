@@ -44,7 +44,7 @@ struct EventTypeTests {
             .taskExpired,
             .taskCancelled,
             .taskFailed,
-            .initialization,
+            .metricKitDataReceived,
             .appEnteredBackground,
             .appWillEnterForeground
         ]
@@ -82,7 +82,7 @@ struct EventTypeTests {
             .taskExpired,
             .taskCancelled,
             .taskFailed,
-            .initialization,
+            .metricKitDataReceived,
             .appEnteredBackground,
             .appWillEnterForeground
         ]

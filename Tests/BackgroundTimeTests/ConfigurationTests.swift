@@ -19,25 +19,18 @@ struct ConfigurationTests {
         let defaultConfig = BackgroundTimeConfiguration.default
         
         #expect(defaultConfig.maxStoredEvents == 1000, "Default max stored events should be 1000")
-        #expect(defaultConfig.apiEndpoint == nil, "Default API endpoint should be nil")
-        #expect(defaultConfig.enableNetworkSync == false, "Default network sync should be disabled")
         #expect(defaultConfig.enableDetailedLogging == true, "Default detailed logging should be enabled")
         #expect(BackgroundTimeConfiguration.sdkVersion == "1.0.0", "SDK version should be 1.0.0")
     }
     
     @Test("Custom BackgroundTimeConfiguration with all parameters")
     func testCustomConfigurationAllParams() async throws {
-        let customURL = URL(string: "https://api.example.com/v2/background-tasks")!
         let config = BackgroundTimeConfiguration(
             maxStoredEvents: 2500,
-            apiEndpoint: customURL,
-            enableNetworkSync: true,
             enableDetailedLogging: false
         )
         
         #expect(config.maxStoredEvents == 2500, "Custom max stored events should be 2500")
-        #expect(config.apiEndpoint == customURL, "Custom API endpoint should match")
-        #expect(config.enableNetworkSync == true, "Custom network sync should be enabled")
         #expect(config.enableDetailedLogging == false, "Custom detailed logging should be disabled")
     }
     
@@ -46,31 +39,17 @@ struct ConfigurationTests {
         // Test with only maxStoredEvents changed
         let config1 = BackgroundTimeConfiguration(maxStoredEvents: 500)
         #expect(config1.maxStoredEvents == 500)
-        #expect(config1.apiEndpoint == nil)
-        #expect(config1.enableNetworkSync == false)
         #expect(config1.enableDetailedLogging == true)
         
-        // Test with only apiEndpoint changed
-        let testURL = URL(string: "https://test.api.com")!
-        let config2 = BackgroundTimeConfiguration(apiEndpoint: testURL)
-        #expect(config2.maxStoredEvents == 1000)
-        #expect(config2.apiEndpoint == testURL)
-        #expect(config2.enableNetworkSync == false)
-        #expect(config2.enableDetailedLogging == true)
-        
-        // Test with only network sync enabled
-        let config3 = BackgroundTimeConfiguration(enableNetworkSync: true)
-        #expect(config3.maxStoredEvents == 1000)
-        #expect(config3.apiEndpoint == nil)
-        #expect(config3.enableNetworkSync == true)
-        #expect(config3.enableDetailedLogging == true)
-        
         // Test with only detailed logging disabled
-        let config4 = BackgroundTimeConfiguration(enableDetailedLogging: false)
-        #expect(config4.maxStoredEvents == 1000)
-        #expect(config4.apiEndpoint == nil)
-        #expect(config4.enableNetworkSync == false)
-        #expect(config4.enableDetailedLogging == false)
+        let config2 = BackgroundTimeConfiguration(enableDetailedLogging: false)
+        #expect(config2.maxStoredEvents == 1000)
+        #expect(config2.enableDetailedLogging == false)
+        
+        // Test with both parameters changed
+        let config3 = BackgroundTimeConfiguration(maxStoredEvents: 750, enableDetailedLogging: false)
+        #expect(config3.maxStoredEvents == 750)
+        #expect(config3.enableDetailedLogging == false)
     }
     
     @Test("BackgroundTimeConfiguration description property")
@@ -79,16 +58,16 @@ struct ConfigurationTests {
         let defaultConfig = BackgroundTimeConfiguration.default
         let defaultDescription = defaultConfig.description
         #expect(defaultDescription.contains("maxEvents: 1000"), "Description should contain max events")
-        #expect(defaultDescription.contains("networkSync: false"), "Description should contain network sync status")
+        #expect(defaultDescription.contains("detailedLogging: true"), "Description should contain detailed logging status")
         
         // Test custom configuration description
         let customConfig = BackgroundTimeConfiguration(
             maxStoredEvents: 750,
-            enableNetworkSync: true
+            enableDetailedLogging: false
         )
         let customDescription = customConfig.description
         #expect(customDescription.contains("maxEvents: 750"), "Description should contain custom max events")
-        #expect(customDescription.contains("networkSync: true"), "Description should contain custom network sync status")
+        #expect(customDescription.contains("detailedLogging: false"), "Description should contain custom detailed logging status")
         
         // Test edge case with zero events
         let zeroConfig = BackgroundTimeConfiguration(maxStoredEvents: 0)
@@ -103,19 +82,6 @@ struct ConfigurationTests {
     
     @Test("BackgroundTimeConfiguration edge cases")
     func testConfigurationEdgeCases() async throws {
-        // Test with invalid URLs (shouldn't crash)
-        let validURL1 = URL(string: "https://valid.com")!
-        let validURL2 = URL(string: "http://localhost:8080/api")!
-        let validURL3 = URL(string: "https://api.company.co.uk/v3/tasks")!
-        
-        let config1 = BackgroundTimeConfiguration(apiEndpoint: validURL1)
-        let config2 = BackgroundTimeConfiguration(apiEndpoint: validURL2)
-        let config3 = BackgroundTimeConfiguration(apiEndpoint: validURL3)
-        
-        #expect(config1.apiEndpoint == validURL1)
-        #expect(config2.apiEndpoint == validURL2)
-        #expect(config3.apiEndpoint == validURL3)
-        
         // Test with extreme maxStoredEvents values
         let minConfig = BackgroundTimeConfiguration(maxStoredEvents: 1)
         let maxConfig = BackgroundTimeConfiguration(maxStoredEvents: Int.max)
@@ -123,20 +89,27 @@ struct ConfigurationTests {
         #expect(minConfig.maxStoredEvents == 1)
         #expect(maxConfig.maxStoredEvents == Int.max)
         
-        // Test all boolean combinations
+        // Test boolean combinations for detailed logging
+        let loggingEnabledConfig = BackgroundTimeConfiguration(enableDetailedLogging: true)
+        let loggingDisabledConfig = BackgroundTimeConfiguration(enableDetailedLogging: false)
+        
+        #expect(loggingEnabledConfig.enableDetailedLogging == true)
+        #expect(loggingDisabledConfig.enableDetailedLogging == false)
+        
+        // Test combined configurations
         let combinations = [
-            (networkSync: true, detailedLogging: true),
-            (networkSync: true, detailedLogging: false),
-            (networkSync: false, detailedLogging: true),
-            (networkSync: false, detailedLogging: false)
+            (maxEvents: 100, detailedLogging: true),
+            (maxEvents: 500, detailedLogging: false),
+            (maxEvents: 1000, detailedLogging: true),
+            (maxEvents: 2000, detailedLogging: false)
         ]
         
         for combination in combinations {
             let config = BackgroundTimeConfiguration(
-                enableNetworkSync: combination.networkSync,
+                maxStoredEvents: combination.maxEvents,
                 enableDetailedLogging: combination.detailedLogging
             )
-            #expect(config.enableNetworkSync == combination.networkSync)
+            #expect(config.maxStoredEvents == combination.maxEvents)
             #expect(config.enableDetailedLogging == combination.detailedLogging)
         }
     }
@@ -176,7 +149,7 @@ struct ConfigurationTests {
             BackgroundTimeConfiguration.default,
             BackgroundTimeConfiguration(maxStoredEvents: 100),
             BackgroundTimeConfiguration(maxStoredEvents: 2000, enableDetailedLogging: false),
-            BackgroundTimeConfiguration(enableNetworkSync: true, enableDetailedLogging: true)
+            BackgroundTimeConfiguration(enableDetailedLogging: true)
         ]
         
         for config in configs {
@@ -206,9 +179,7 @@ struct ConfigurationTests {
         for i in 0..<1000 {
             let config = BackgroundTimeConfiguration(
                 maxStoredEvents: i % 1000 + 100,
-                apiEndpoint: i % 2 == 0 ? URL(string: "https://api\(i).com") : nil,
-                enableNetworkSync: i % 3 == 0,
-                enableDetailedLogging: i % 4 != 0
+                enableDetailedLogging: i % 2 == 0
             )
             configurations.append(config)
         }

@@ -20,6 +20,10 @@ class SocialMediaBackgroundManager: ObservableObject {
     @Published var isRefreshing = false
     @Published var lastRefreshTime: Date?
     @Published var lastSyncTime: Date?
+    @Published var isContinuedDataProcessing = false
+    @Published var isContinuedMediaProcessing = false
+    @Published var lastContinuedDataProcessingTime: Date?
+    @Published var lastContinuedMediaProcessingTime: Date?
     
     private var modelContainer: ModelContainer?
     
@@ -46,6 +50,8 @@ class SocialMediaBackgroundManager: ObservableObject {
         case refreshSocialFeed
         case downloadMedia
         case syncChatMessages
+        case continuedDataProcessing
+        case continuedMediaProcessing
         
         init?(stringIdentifier: String) {
             guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return nil }
@@ -54,6 +60,12 @@ class SocialMediaBackgroundManager: ObservableObject {
                 self = .refreshSocialFeed
             case "\(bundleIdentifier)-sync-chat-messages":
                 self = .syncChatMessages
+            case "\(bundleIdentifier)-download-media":
+                self = .downloadMedia
+            case "\(bundleIdentifier)-continued-data-processing":
+                self = .continuedDataProcessing
+            case "\(bundleIdentifier)-continued-media-processing":
+                self = .continuedMediaProcessing
             default:
                 return nil
             }
@@ -68,6 +80,10 @@ class SocialMediaBackgroundManager: ObservableObject {
                 return [bundleIdentifier, "download-media"].compactMap { $0 }.joined(separator: "-")
             case .syncChatMessages:
                 return [bundleIdentifier, "sync-chat-messages"].compactMap { $0 }.joined(separator: "-")
+            case .continuedDataProcessing:
+                return [bundleIdentifier, "continued-data-processing"].compactMap { $0 }.joined(separator: "-")
+            case .continuedMediaProcessing:
+                return [bundleIdentifier, "continued-media-processing"].compactMap { $0 }.joined(separator: "-")
             }
         }
     }
@@ -103,6 +119,28 @@ class SocialMediaBackgroundManager: ObservableObject {
             }
             Task { @MainActor in
                 self.handleChatSyncTask(appRefreshTask)
+            }
+        }
+        
+        // Register handler for continued data processing
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: AppBackgroundTaskIdentifier.continuedDataProcessing.description, using: nil) { task in
+            guard let continuedTask = task as? BGContinuedProcessingTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            Task { @MainActor in
+                self.handleContinuedProcessingTask(continuedTask)
+            }
+        }
+        
+        // Register handler for continued media processing
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: AppBackgroundTaskIdentifier.continuedMediaProcessing.description, using: nil) { task in
+            guard let continuedTask = task as? BGContinuedProcessingTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            Task { @MainActor in
+                self.handleContinuedProcessingTask(continuedTask)
             }
         }
         
@@ -178,6 +216,36 @@ class SocialMediaBackgroundManager: ObservableObject {
         Task {
             let success = await performChatSync()
             task.setTaskCompleted(success: success)
+        }
+    }
+    
+    func handleContinuedProcessingTask(_ task: BGContinuedProcessingTask) {
+        logger.info("Handling continued processing task: \(task.identifier)")
+        
+        task.expirationHandler = {
+            self.logger.warning("Continued processing task expired: \(task.identifier)")
+            task.setTaskCompleted(success: false)
+        }
+        
+        Task {
+            let success: Bool
+            guard let taskIdentifier = AppBackgroundTaskIdentifier(stringIdentifier: task.identifier) else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            
+            switch taskIdentifier {
+            case .continuedDataProcessing:
+                success = await performContinuedDataProcessing()
+                task.setTaskCompleted(success: success)
+                scheduleContinuedDataProcessing()
+            case .continuedMediaProcessing:
+                success = await performContinuedMediaProcessing()
+                task.setTaskCompleted(success: success)
+                scheduleContinuedMediaProcessing()
+            default:
+                task.setTaskCompleted(success: false)
+            }
         }
     }
     
@@ -289,6 +357,100 @@ class SocialMediaBackgroundManager: ObservableObject {
         }
     }
     
+    private func performContinuedDataProcessing() async -> Bool {
+        await MainActor.run {
+            self.isContinuedDataProcessing = true
+        }
+        
+        do {
+            // Simulate long-running data processing tasks
+            try await Task.sleep(for: .seconds(5))
+            
+            // Simulate processing large datasets
+            let dataBatches = ["user_analytics", "content_indexing", "recommendation_engine", "search_optimization"]
+            
+            for (index, batch) in dataBatches.enumerated() {
+                // Each batch takes significant time to process
+                try await Task.sleep(for: .seconds(10))
+                logger.info("Processed data batch \(index + 1)/\(dataBatches.count): \(batch)")
+                
+                // Update progress periodically
+                if index % 2 == 0 {
+                    logger.info("Continued data processing progress: \(Int(Double(index + 1) / Double(dataBatches.count) * 100))%")
+                }
+            }
+            
+            // Final cleanup and indexing
+            try await Task.sleep(for: .seconds(3))
+            logger.info("Successfully completed continued data processing for \(dataBatches.count) batches")
+            
+            await MainActor.run {
+                self.lastContinuedDataProcessingTime = Date()
+                self.isContinuedDataProcessing = false
+            }
+            
+            return true
+            
+        } catch {
+            logger.error("Continued data processing failed: \(error)")
+            await MainActor.run {
+                self.isContinuedDataProcessing = false
+            }
+            return false
+        }
+    }
+    
+    private func performContinuedMediaProcessing() async -> Bool {
+        await MainActor.run {
+            self.isContinuedMediaProcessing = true
+        }
+        
+        do {
+            // Simulate long-running media processing tasks
+            try await Task.sleep(for: .seconds(2))
+            
+            // Simulate processing large media files
+            let mediaFiles = [
+                "4k_video_1.mov", "raw_image_batch_1.zip", "audio_collection.flac",
+                "hdr_photos.dng", "360_video.mp4", "time_lapse_sequence.mov"
+            ]
+            
+            for (index, file) in mediaFiles.enumerated() {
+                // Each media file takes significant time to process
+                let processingTime = Double.random(in: 8...15)
+                try await Task.sleep(for: .seconds(processingTime))
+                
+                logger.info("Processed media file \(index + 1)/\(mediaFiles.count): \(file)")
+                
+                // Simulate additional operations like thumbnail generation, format conversion
+                try await Task.sleep(for: .seconds(2))
+                logger.info("Generated thumbnails and metadata for: \(file)")
+                
+                // Update progress
+                let progress = Int(Double(index + 1) / Double(mediaFiles.count) * 100)
+                logger.info("Continued media processing progress: \(progress)%")
+            }
+            
+            // Final optimization and cleanup
+            try await Task.sleep(for: .seconds(4))
+            logger.info("Successfully completed continued media processing for \(mediaFiles.count) files")
+            
+            await MainActor.run {
+                self.lastContinuedMediaProcessingTime = Date()
+                self.isContinuedMediaProcessing = false
+            }
+            
+            return true
+            
+        } catch {
+            logger.error("Continued media processing failed: \(error)")
+            await MainActor.run {
+                self.isContinuedMediaProcessing = false
+            }
+            return false
+        }
+    }
+    
     // MARK: - Task Scheduling
     
     func scheduleTasks() async {
@@ -299,6 +461,8 @@ class SocialMediaBackgroundManager: ObservableObject {
         scheduleAppRefreshTask()
         scheduleMediaDownload()
         scheduleChatSyncTask()
+        scheduleContinuedDataProcessing()
+        scheduleContinuedMediaProcessing()
     }
     
     func scheduleAppRefreshTask() {
@@ -339,6 +503,38 @@ class SocialMediaBackgroundManager: ObservableObject {
         }
     }
     
+    func scheduleContinuedDataProcessing() {
+        let request = BGContinuedProcessingTaskRequest(
+            identifier: AppBackgroundTaskIdentifier.continuedDataProcessing.description,
+            title: "Processing Data",
+            subtitle: "Analyzing user analytics and content"
+        )
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 30 * 60) // 30 minutes from now
+        
+        do {
+            try BGTaskScheduler.shared.submit(request)
+            logger.info("Scheduled continued data processing task")
+        } catch {
+            logger.error("Failed to schedule continued data processing task: \(error)")
+        }
+    }
+    
+    func scheduleContinuedMediaProcessing() {
+        let request = BGContinuedProcessingTaskRequest(
+            identifier: AppBackgroundTaskIdentifier.continuedMediaProcessing.description,
+            title: "Processing Media",
+            subtitle: "Converting and optimizing media files"
+        )
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 60 * 60) // 1 hour from now
+        
+        do {
+            try BGTaskScheduler.shared.submit(request)
+            logger.info("Scheduled continued media processing task")
+        } catch {
+            logger.error("Failed to schedule continued media processing task: \(error)")
+        }
+    }
+    
     // MARK: - Manual Operations
     
     func manualRefreshFeed() async {
@@ -347,6 +543,14 @@ class SocialMediaBackgroundManager: ObservableObject {
     
     func manualSyncChat() async {
         _ = await performChatSync()
+    }
+    
+    func manualContinuedDataProcessing() async {
+        _ = await performContinuedDataProcessing()
+    }
+    
+    func manualContinuedMediaProcessing() async {
+        _ = await performContinuedMediaProcessing()
     }
     
     func cancelAllBackgroundTasks() {
@@ -389,9 +593,10 @@ class SocialMediaBackgroundManager: ObservableObject {
         var posts: [SocialMediaPost] = []
         
         for _ in 0..<numberOfPosts {
+            let content = contents.randomElement()!
             let post = SocialMediaPost(
                 author: authors.randomElement()!,
-                content: contents.randomElement()!,
+                content: content,
                 imageURL: imageURLs.randomElement()!,
                 likes: Int.random(in: 0...100),
                 comments: Int.random(in: 0...20),
@@ -422,9 +627,11 @@ class SocialMediaBackgroundManager: ObservableObject {
         var chatMessages: [ChatMessage] = []
         
         for _ in 0..<numberOfMessages {
+            let sender = senders.randomElement()!
+            let content = messages.randomElement()!
             let message = ChatMessage(
-                sender: senders.randomElement()!,
-                content: messages.randomElement()!,
+                sender: sender,
+                content: content,
                 timestamp: Date(timeIntervalSinceNow: TimeInterval.random(in: -1800...0))
             )
             chatMessages.append(message)

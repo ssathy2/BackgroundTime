@@ -17,7 +17,7 @@ public enum BackgroundTaskEventType: String, Codable, CaseIterable, Sendable {
     case taskExpired = "task_expired"
     case taskCancelled = "task_cancelled"
     case taskFailed = "task_failed"
-    case initialization = "sdk_initialization"
+    case metricKitDataReceived = "metrickit_data_received"
     case appEnteredBackground = "app_entered_background"
     case appWillEnterForeground = "app_will_enter_foreground"
     // Continuous Background Tasks (iOS 26.0+)
@@ -42,15 +42,16 @@ public enum BackgroundTaskEventType: String, Codable, CaseIterable, Sendable {
     }
     
     /// Returns true if this event type should be included in task statistics calculations
+    /// This excludes app lifecycle events but includes all task-related events including continuous tasks
     public var isTaskStatisticsEvent: Bool {
         switch self {
-        case .taskScheduled, .taskExecutionStarted, .taskExecutionCompleted,
+        case .appEnteredBackground, .appWillEnterForeground, .metricKitDataReceived:
+            return false
+        case .taskScheduled, .taskExecutionStarted, .taskExecutionCompleted, 
              .taskExpired, .taskCancelled, .taskFailed,
              .continuousTaskStarted, .continuousTaskPaused, .continuousTaskResumed,
              .continuousTaskStopped, .continuousTaskProgress:
             return true
-        case .initialization, .appEnteredBackground, .appWillEnterForeground:
-            return false
         }
     }
 }

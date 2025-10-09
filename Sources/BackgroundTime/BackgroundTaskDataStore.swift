@@ -265,7 +265,7 @@ extension BackgroundTaskDataStore {
         return generateTaskMetrics(for: taskIdentifier, from: taskEvents)
     }
     
-    private func generateTaskMetrics(for taskIdentifier: String, from taskEvents: [BackgroundTaskEvent]) -> TaskPerformanceMetrics? {
+    func generateTaskMetrics(for taskIdentifier: String, from taskEvents: [BackgroundTaskEvent]) -> TaskPerformanceMetrics? {
         // Filter to only include events that should be counted in task statistics
         let statisticsEvents = taskEvents.filter { $0.type.isTaskStatisticsEvent }
         guard !statisticsEvents.isEmpty else { return nil }

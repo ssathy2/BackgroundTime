@@ -34,7 +34,7 @@ struct TaskStatisticsEventFilterTests {
         
         // Events that should NOT be included in task statistics
         let nonTaskStatisticsEvents: [BackgroundTaskEventType] = [
-            .initialization,
+            .metricKitDataReceived,
             .appEnteredBackground,
             .appWillEnterForeground
         ]
@@ -68,8 +68,8 @@ struct TaskStatisticsEventFilterTests {
                 #expect(isTaskStatistics == true, 
                        "\(eventType.rawValue) should be classified as task statistics event")
                 
-            case .initialization, .appEnteredBackground, .appWillEnterForeground:
-                #expect(isTaskStatistics == false, 
+            case .metricKitDataReceived, .appEnteredBackground, .appWillEnterForeground:
+                #expect(isTaskStatistics == false,
                        "\(eventType.rawValue) should be classified as non-task statistics event")
             }
         }
@@ -101,7 +101,7 @@ struct TaskStatisticsEventFilterTests {
             createTestEvent(taskId: "task-4", type: .taskCancelled, success: false),
             
             // Non-task statistics events (should NOT be counted)
-            createTestEvent(taskId: "sdk", type: .initialization, success: true),
+            createTestEvent(taskId: "sdk", type: .metricKitDataReceived, success: true),
             createTestEvent(taskId: "app", type: .appEnteredBackground, success: true),
             createTestEvent(taskId: "app", type: .appWillEnterForeground, success: true),
         ]
@@ -193,7 +193,7 @@ struct TaskStatisticsEventFilterTests {
             createTestEvent(taskId: taskId, type: .taskExecutionCompleted, success: false, duration: 1.0, timestamp: Date().addingTimeInterval(-480)),
             
             // Non-task statistics events (should be ignored for task metrics)
-            createTestEvent(taskId: taskId, type: .initialization, success: true, timestamp: Date().addingTimeInterval(-800)),
+            createTestEvent(taskId: taskId, type: .metricKitDataReceived, success: true, timestamp: Date().addingTimeInterval(-800)),
             createTestEvent(taskId: taskId, type: .appEnteredBackground, success: true, timestamp: Date().addingTimeInterval(-600)),
             createTestEvent(taskId: taskId, type: .appWillEnterForeground, success: true, timestamp: Date().addingTimeInterval(-400)),
         ]
@@ -539,7 +539,7 @@ struct TaskStatisticsEventFilterTests {
         
         // Create only non-task statistics events
         let nonTaskEvents = [
-            createTestEvent(taskId: "sdk", type: .initialization, success: true),
+            createTestEvent(taskId: "sdk", type: .metricKitDataReceived, success: true),
             createTestEvent(taskId: "app", type: .appEnteredBackground, success: true),
             createTestEvent(taskId: "app", type: .appWillEnterForeground, success: true),
         ]

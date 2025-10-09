@@ -325,7 +325,7 @@ import Darwin
         let event = BackgroundTaskEvent(
             id: UUID(),
             taskIdentifier: "METRICKIT_METRICS",
-            type: .initialization,
+            type: .metricKitDataReceived,
             timestamp: Date(),
             duration: nil,
             success: true,
@@ -345,7 +345,7 @@ import Darwin
         let event = BackgroundTaskEvent(
             id: UUID(),
             taskIdentifier: "METRICKIT_DIAGNOSTICS",
-            type: .initialization,
+            type: .metricKitDataReceived,
             timestamp: Date(),
             duration: nil,
             success: false,

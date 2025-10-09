@@ -340,7 +340,7 @@ struct TimeRangeFilteringTests {
             .taskExpired,
             .taskCancelled,
             .taskFailed,
-            .initialization,
+            .metricKitDataReceived,
             .appEnteredBackground,
             .appWillEnterForeground
         ]

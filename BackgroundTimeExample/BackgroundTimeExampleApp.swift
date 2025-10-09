@@ -18,8 +18,6 @@ struct BackgroundTimeExampleApp: App {
         // Initialize BackgroundTime SDK with configuration optimized for social media app
         let configuration = BackgroundTimeConfiguration(
             maxStoredEvents: 2000, // More events for social media activity
-            apiEndpoint: nil, // No remote dashboard for this example
-            enableNetworkSync: false,
             enableDetailedLogging: true
         )
         BackgroundTime.shared.initialize(configuration: configuration)

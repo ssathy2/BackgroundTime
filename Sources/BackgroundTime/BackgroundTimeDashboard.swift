@@ -195,12 +195,20 @@ struct OverviewTabView: View {
     let selectedTimeRange: TimeRange
     
     private var filteredEvents: [BackgroundTaskEvent] {
-        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.timeInterval)
-        let filtered = viewModel.events.filter { $0.timestamp >= cutoffDate }
+        let filtered = viewModel.events.filter { event in
+            selectedTimeRange.contains(event.timestamp)
+        }
         
+        // Debug logging for overview filtering
         if !filtered.isEmpty {
-            for event in filtered.prefix(5) { // Show first 5 events
-                print("   - \(event.type.rawValue): \(event.taskIdentifier), success: \(event.success), time: \(event.timestamp)")
+            print("📊 Overview Tab - Filtered Events:")
+            print("   - \(selectedTimeRange.debugDescription)")
+            print("   - Total events in view model: \(viewModel.events.count)")
+            print("   - Filtered events: \(filtered.count)")
+            
+            // Show sample events for debugging
+            for event in filtered.prefix(3) {
+                print("   - \(event.type.rawValue): \(event.taskIdentifier), time: \(event.timestamp)")
             }
         }
         
@@ -212,13 +220,13 @@ struct OverviewTabView: View {
             return nil
         }
         
-        
-        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.timeInterval)
         let stats = BackgroundTaskDataStore.shared.generateStatistics(
             for: filteredEvents, 
-            in: cutoffDate...Date()
+            in: selectedTimeRange.startDate...selectedTimeRange.endDate
         )
-                
+        
+        print("📊 Overview Tab - Statistics: \(stats.totalTasksExecuted) executed, Success: \(String(format: "%.1f", stats.successRate * 100))%")
+        
         return stats
     }
     
@@ -377,8 +385,9 @@ struct TimelineTabView: View {
     let selectedTimeRange: TimeRange
     
     private var filteredTimelineData: [TimelineDataPoint] {
-        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.timeInterval)
-        return viewModel.timelineData.filter { $0.timestamp >= cutoffDate }
+        return viewModel.timelineData.filter { dataPoint in
+            selectedTimeRange.contains(dataPoint.timestamp)
+        }
     }
     
     var body: some View {
@@ -412,16 +421,17 @@ struct PerformanceTabView: View {
     @State private var selectedTaskForDetail: String?
     
     private var filteredEvents: [BackgroundTaskEvent] {
-        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.timeInterval)
-        return viewModel.events.filter { $0.timestamp >= cutoffDate }
+        return viewModel.events.filter { event in
+            selectedTimeRange.contains(event.timestamp)
+        }
     }
     
     private var filteredStatistics: BackgroundTaskStatistics? {
         guard !filteredEvents.isEmpty else { return nil }
-        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.timeInterval)
+        
         return BackgroundTaskDataStore.shared.generateStatistics(
             for: filteredEvents,
-            in: cutoffDate...Date()
+            in: selectedTimeRange.startDate...selectedTimeRange.endDate
         )
     }
     
@@ -1053,16 +1063,17 @@ struct ErrorsTabView: View {
     let selectedTimeRange: TimeRange
     
     private var filteredEvents: [BackgroundTaskEvent] {
-        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.timeInterval)
-        return viewModel.events.filter { $0.timestamp >= cutoffDate }
+        return viewModel.events.filter { event in
+            selectedTimeRange.contains(event.timestamp)
+        }
     }
     
     private var filteredStatistics: BackgroundTaskStatistics? {
         guard !filteredEvents.isEmpty else { return nil }
-        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.timeInterval)
+        
         return BackgroundTaskDataStore.shared.generateStatistics(
             for: filteredEvents,
-            in: cutoffDate...Date()
+            in: selectedTimeRange.startDate...selectedTimeRange.endDate
         )
     }
     
@@ -1130,8 +1141,9 @@ struct ContinuousTasksTabView: View {
     let selectedTimeRange: TimeRange
     
     private var filteredEvents: [BackgroundTaskEvent] {
-        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.timeInterval)
-        return viewModel.events.filter { $0.timestamp >= cutoffDate }
+        return viewModel.events.filter { event in
+            selectedTimeRange.contains(event.timestamp)
+        }
     }
     
     var body: some View {
@@ -1681,7 +1693,7 @@ extension BackgroundTaskEventType {
             return "xmark.circle.fill"
         case .taskFailed:
             return "exclamationmark.triangle.fill"
-        case .initialization:
+        case .metricKitDataReceived:
             return "gear"
         case .appEnteredBackground:
             return "moon.fill"
@@ -2076,7 +2088,12 @@ struct DetailedTaskPerformanceView: View {
 
 extension TimeRange {
     var startDate: Date {
-        return Date().addingTimeInterval(-timeInterval)
+        let endDate = Date()
+        if self == .all {
+            return Date(timeIntervalSince1970: 0) // Include all events
+        } else {
+            return endDate.addingTimeInterval(-timeInterval)
+        }
     }
     
     var endDate: Date {
@@ -2085,5 +2102,15 @@ extension TimeRange {
     
     func contains(_ date: Date) -> Bool {
         return date >= startDate && date <= endDate
+    }
+    
+    /// Create a DateInterval for this time range
+    var dateInterval: DateInterval {
+        return DateInterval(start: startDate, end: endDate)
+    }
+    
+    /// Debug description for logging
+    var debugDescription: String {
+        return "\(displayName): \(startDate) to \(endDate) (\(timeInterval)s)"
     }
 }
