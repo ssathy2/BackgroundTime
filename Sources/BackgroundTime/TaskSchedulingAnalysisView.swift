@@ -30,23 +30,30 @@ public struct TaskSchedulingAnalysisView: View {
                 }
                 .pickerStyle(SegmentedPickerStyle())
                 .padding()
+                .background(Color(.systemBackground))
                 
                 // Content
-                TabView(selection: $selectedTab) {
-                    AnalysisOverviewTabView(analysis: analysis)
-                        .tag(0)
-                    
-                    TimingAnalysisTabView(analysis: analysis)
-                        .tag(1)
-                    
-                    RecommendationsTabView(recommendations: analysis.optimizationRecommendations)
-                        .tag(2)
+                Group {
+                    if selectedTab == 0 {
+                        AnalysisOverviewTabView(analysis: analysis)
+                    } else if selectedTab == 1 {
+                        TimingAnalysisTabView(analysis: analysis)
+                    } else {
+                        RecommendationsTabView(recommendations: analysis.optimizationRecommendations)
+                    }
                 }
-                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                .animation(.easeInOut(duration: 0.2), value: selectedTab)
             }
-            .navigationTitle("Task: \(analysis.taskIdentifier)")
+            .navigationTitle("Task: \(truncatedTaskIdentifier)")
             .navigationBarTitleDisplayMode(.inline)
         }
+    }
+    
+    private var truncatedTaskIdentifier: String {
+        if analysis.taskIdentifier.count > 30 {
+            return String(analysis.taskIdentifier.prefix(27)) + "..."
+        }
+        return analysis.taskIdentifier
     }
 }
 
@@ -70,6 +77,7 @@ private struct AnalysisOverviewTabView: View {
             }
             .padding()
         }
+        .background(Color(.systemGroupedBackground))
     }
 }
 
@@ -104,8 +112,9 @@ private struct ExecutionSummaryCard: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
 }
 
@@ -132,13 +141,14 @@ private struct DelayStatisticsCard: View {
                 
                 DelayStatRow(
                     title: "Min/Max Delay",
-                    value: "\(formatTimeInterval(analysis.minExecutionDelay)) / \(formatTimeInterval(analysis.maxExecutionDelay))"
+                    value: "\(formatTimeInterval(min(analysis.minExecutionDelay, analysis.maxExecutionDelay))) / \(formatTimeInterval(max(analysis.minExecutionDelay, analysis.maxExecutionDelay)))"
                 )
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
 }
 
@@ -196,8 +206,9 @@ private struct PropertyImpactSummaryCard: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
 }
 
@@ -244,6 +255,7 @@ private struct TimingAnalysisTabView: View {
             }
             .padding()
         }
+        .background(Color(.systemGroupedBackground))
     }
 }
 
@@ -252,13 +264,22 @@ private struct OptimalTimeWindowsChart: View {
     let analysis: TaskSchedulingAnalysis
     
     private var timeWindowData: [(String, TimeInterval)] {
-        let immediateWindows = analysis.immediateTasksAnalysis.optimalTimeWindows.prefix(5)
-        let delayedWindows = analysis.delayedTasksAnalysis.optimalTimeWindows.prefix(5)
+        let immediateWindows = analysis.immediateTasksAnalysis.optimalTimeWindows.prefix(3)
+        let delayedWindows = analysis.delayedTasksAnalysis.optimalTimeWindows.prefix(3)
         
         let allWindows = Array(immediateWindows) + Array(delayedWindows)
-        return Array(allWindows.prefix(8)).map { window in
+        
+        // Sort by average delay and take the best performing windows
+        let sortedWindows = allWindows.sorted { $0.averageDelay < $1.averageDelay }
+        
+        return Array(sortedWindows.prefix(6)).map { window in
             (window.description, window.averageDelay)
         }
+    }
+    
+    private var maxTimeWindowDelay: TimeInterval {
+        let maxDelay = timeWindowData.map { $0.1 }.max() ?? 0
+        return max(maxDelay * 1.1, 60) // Add 10% padding or minimum 60 seconds
     }
     
     var body: some View {
@@ -267,34 +288,51 @@ private struct OptimalTimeWindowsChart: View {
                 .font(.headline)
                 .foregroundColor(.primary)
             
-            Chart(timeWindowData, id: \.0) { item in
-                BarMark(
-                    x: .value("Time Window", item.0),
-                    y: .value("Average Delay", item.1)
-                )
-                .foregroundStyle(.blue)
-            }
-            .frame(height: 200)
-            .chartYAxis {
-                AxisMarks(format: .byteCount(style: .memory))
-            }
-            .chartXAxis {
-                AxisMarks { value in
-                    AxisGridLine()
-                    AxisTick()
-                    AxisValueLabel {
-                        if let stringValue = value.as(String.self) {
-                            Text(stringValue)
-                                .font(.caption2)
-                                .rotationEffect(Angle.degrees(-45))
+            if timeWindowData.isEmpty {
+                Text("No time window data available")
+                    .foregroundColor(.secondary)
+                    .frame(height: 200)
+                    .frame(maxWidth: .infinity)
+            } else {
+                Chart(timeWindowData, id: \.0) { item in
+                    BarMark(
+                        x: .value("Time Window", item.0),
+                        y: .value("Average Delay", item.1)
+                    )
+                    .foregroundStyle(.blue)
+                }
+                .frame(height: 200)
+                .chartYAxis {
+                    AxisMarks { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel {
+                            if let timeValue = value.as(Double.self) {
+                                Text(formatTimeInterval(timeValue))
+                            }
+                        }
+                    }
+                }
+                .chartYScale(domain: 0...maxTimeWindowDelay)
+                .chartXAxis {
+                    AxisMarks { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel {
+                            if let stringValue = value.as(String.self) {
+                                Text(stringValue)
+                                    .font(.caption2)
+                                    .rotationEffect(Angle.degrees(-45))
+                            }
                         }
                     }
                 }
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
 }
 
@@ -305,6 +343,7 @@ private struct PropertyComparisonChart: View {
     private var comparisonData: [(String, TimeInterval)] {
         var data: [(String, TimeInterval)] = []
         
+        // Always include all categories that have data or meaningful zero values
         if analysis.immediateTasksAnalysis.taskCount > 0 {
             data.append(("Immediate", analysis.immediateTasksAnalysis.averageDelay))
         }
@@ -318,7 +357,21 @@ private struct PropertyComparisonChart: View {
             data.append(("Power", analysis.powerRequiredAnalysis.averageDelay))
         }
         
+        // If we only have one data point, add context by showing zero values for comparison
+        if data.count == 1 {
+            if analysis.immediateTasksAnalysis.taskCount > 0 && analysis.delayedTasksAnalysis.taskCount == 0 {
+                data.append(("Delayed", 0.0))
+            } else if analysis.delayedTasksAnalysis.taskCount > 0 && analysis.immediateTasksAnalysis.taskCount == 0 {
+                data.append(("Immediate", 0.0))
+            }
+        }
+        
         return data
+    }
+    
+    private var maxDelayValue: TimeInterval {
+        let maxDelay = comparisonData.map { $0.1 }.max() ?? 0
+        return max(maxDelay * 1.1, 60) // Add 10% padding or minimum 60 seconds
     }
     
     var body: some View {
@@ -327,18 +380,38 @@ private struct PropertyComparisonChart: View {
                 .font(.headline)
                 .foregroundColor(.primary)
             
-            Chart(comparisonData, id: \.0) { item in
-                BarMark(
-                    x: .value("Property", item.0),
-                    y: .value("Average Delay", item.1)
-                )
-                .foregroundStyle(colorForProperty(item.0))
+            if comparisonData.isEmpty {
+                Text("No property data available")
+                    .foregroundColor(.secondary)
+                    .frame(height: 200)
+                    .frame(maxWidth: .infinity)
+            } else {
+                Chart(comparisonData, id: \.0) { item in
+                    BarMark(
+                        x: .value("Property", item.0),
+                        y: .value("Average Delay", item.1)
+                    )
+                    .foregroundStyle(colorForProperty(item.0))
+                }
+                .frame(height: 200)
+                .chartYAxis {
+                    AxisMarks { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel {
+                            if let timeValue = value.as(Double.self) {
+                                Text(formatTimeInterval(timeValue))
+                            }
+                        }
+                    }
+                }
+                .chartYScale(domain: 0...maxDelayValue)
             }
-            .frame(height: 200)
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
     
     private func colorForProperty(_ property: String) -> Color {
@@ -360,11 +433,18 @@ private struct RecommendationsTabView: View {
     
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 16) {
+            LazyVStack(alignment: .leading, spacing: 16) {
                 if recommendations.isEmpty {
-                    Text("No optimization recommendations available.")
-                        .foregroundColor(.secondary)
-                        .padding()
+                    VStack(spacing: 12) {
+                        Image(systemName: "lightbulb")
+                            .font(.largeTitle)
+                            .foregroundColor(.secondary)
+                        Text("No optimization recommendations available.")
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 40)
                 } else {
                     ForEach(recommendations) { recommendation in
                         RecommendationCard(recommendation: recommendation)
@@ -373,6 +453,7 @@ private struct RecommendationsTabView: View {
             }
             .padding()
         }
+        .background(Color(.systemGroupedBackground))
     }
 }
 
@@ -381,11 +462,12 @@ private struct RecommendationCard: View {
     let recommendation: SchedulingRecommendation
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top) {
                 Text(recommendation.title)
                     .font(.headline)
                     .foregroundColor(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
                 
                 Spacer()
                 
@@ -397,19 +479,22 @@ private struct RecommendationCard: View {
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "chart.line.uptrend.xyaxis")
                         .foregroundColor(.green)
+                        .frame(width: 16, alignment: .leading)
                     Text(recommendation.potentialImprovement)
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundColor(.green)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 
-                HStack {
+                HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "hammer.fill")
                         .foregroundColor(.blue)
+                        .frame(width: 16, alignment: .leading)
                     Text(recommendation.implementation)
                         .font(.subheadline)
                         .foregroundColor(.blue)
@@ -418,8 +503,9 @@ private struct RecommendationCard: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
 }
 
