@@ -25,6 +25,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    - name: Select Xcode Version
+      run: sudo xcode-select -s /Applications/Xcode_26.0.1/Contents/Developer
+    
     - name: Cache Swift Package Manager
       uses: actions/cache@v4
       with:
@@ -51,6 +54,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    - name: Select Xcode Version
+      run: sudo xcode-select -s /Applications/Xcode_26.0.1/Contents/Developer
+    
     - name: Cache Swift Package Manager
       uses: actions/cache@v4
       with:
@@ -76,6 +82,9 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
+    
+    - name: Select Xcode Version
+      run: sudo xcode-select -s /Applications/Xcode_26.0.1.app/Contents/Developer
     
     - name: Build Documentation
       run: |
