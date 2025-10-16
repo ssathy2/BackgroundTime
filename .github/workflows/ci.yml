@@ -34,12 +34,13 @@ jobs:
           ${{ runner.os }}-derived-data-
     
     - name: List Available Schemes
-      run: xcodebuild -list
+      run: xcodebuild -project BackgroundTime.xcodeproj -list
     
     - name: Build for Testing
       run: |
         xcodebuild build-for-testing \
-          -scheme BackgroundTime \
+          -project BackgroundTime.xcodeproj \
+          -scheme BackgroundTimeExample \
           -destination "${{ matrix.destination }}" \
           -derivedDataPath DerivedData \
           -enableCodeCoverage YES \
@@ -49,7 +50,9 @@ jobs:
     - name: Run Tests
       run: |
         xcodebuild test-without-building \
-          -scheme BackgroundTime \
+          -project BackgroundTime.xcodeproj \
+          -scheme BackgroundTimeExample \
+          -testPlan BackgroundTimeExample \
           -destination "${{ matrix.destination }}" \
           -derivedDataPath DerivedData \
           -enableCodeCoverage YES \
@@ -77,8 +80,77 @@ jobs:
         name: coverage-ios
         path: coverage.json
 
-  test-macos:
-    name: Test macOS
+  test-sdk:
+    name: Test SDK (Swift Package)
+    runs-on: macos-26
+    strategy:
+      matrix:
+        platform:
+          - scheme: BackgroundTimeSDK
+            destination: "platform=iOS Simulator,name=iPhone 16 Pro,OS=18.1"
+            testplan: BackgroundTimeSDK
+          - scheme: BackgroundTimeSDK
+            destination: "platform=macOS"
+            testplan: BackgroundTimeSDK
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Cache DerivedData
+      uses: actions/cache@v4
+      with:
+        path: ~/Library/Developer/Xcode/DerivedData
+        key: ${{ runner.os }}-derived-data-${{ hashFiles('**/Package.resolved') }}
+        restore-keys: |
+          ${{ runner.os }}-derived-data-
+    
+    - name: Resolve Swift Package Dependencies
+      run: xcodebuild -resolvePackageDependencies -project BackgroundTime.xcodeproj
+    
+    - name: Build for Testing
+      run: |
+        xcodebuild build-for-testing \
+          -project BackgroundTime.xcodeproj \
+          -scheme ${{ matrix.platform.scheme }} \
+          -destination "${{ matrix.platform.destination }}" \
+          -derivedDataPath DerivedData \
+          -enableCodeCoverage YES \
+          CODE_SIGNING_ALLOWED=NO \
+          | xcpretty && exit ${PIPESTATUS[0]}
+    
+    - name: Run Tests
+      run: |
+        xcodebuild test-without-building \
+          -project BackgroundTime.xcodeproj \
+          -scheme ${{ matrix.platform.scheme }} \
+          -testPlan ${{ matrix.platform.testplan }} \
+          -destination "${{ matrix.platform.destination }}" \
+          -derivedDataPath DerivedData \
+          -enableCodeCoverage YES \
+          -resultBundlePath TestResults.xcresult \
+          CODE_SIGNING_ALLOWED=NO \
+          | xcpretty && exit ${PIPESTATUS[0]}
+    
+    - name: Upload Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-sdk-${{ strategy.job-index }}
+        path: TestResults.xcresult
+    
+    - name: Generate Code Coverage Report
+      run: |
+        xcrun xccov view --report --json DerivedData/Logs/Test/*.xcresult > coverage.json
+        xcrun xccov view --report DerivedData/Logs/Test/*.xcresult
+    
+    - name: Upload Coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-sdk-${{ strategy.job-index }}
+        path: coverage.json
+
+  test-ui:
+    name: Test UI
     runs-on: macos-26
     
     steps:
@@ -95,20 +167,21 @@ jobs:
     - name: Build for Testing
       run: |
         xcodebuild build-for-testing \
-          -scheme BackgroundTime \
-          -destination "platform=macOS" \
+          -project BackgroundTime.xcodeproj \
+          -scheme BackgroundTimeExample \
+          -destination "platform=iOS Simulator,name=iPhone 16 Pro,OS=18.1" \
           -derivedDataPath DerivedData \
-          -enableCodeCoverage YES \
           CODE_SIGNING_ALLOWED=NO \
           | xcpretty && exit ${PIPESTATUS[0]}
     
-    - name: Run Tests
+    - name: Run UI Tests
       run: |
         xcodebuild test-without-building \
-          -scheme BackgroundTime \
-          -destination "platform=macOS" \
+          -project BackgroundTime.xcodeproj \
+          -scheme BackgroundTimeExample \
+          -only-testing:BackgroundTimeExampleUITests \
+          -destination "platform=iOS Simulator,name=iPhone 16 Pro,OS=18.1" \
           -derivedDataPath DerivedData \
-          -enableCodeCoverage YES \
           -resultBundlePath TestResults.xcresult \
           CODE_SIGNING_ALLOWED=NO \
           | xcpretty && exit ${PIPESTATUS[0]}
@@ -117,19 +190,8 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test-results-macos
+        name: test-results-ui
         path: TestResults.xcresult
-    
-    - name: Generate Code Coverage Report
-      run: |
-        xcrun xccov view --report --json DerivedData/Logs/Test/*.xcresult > coverage.json
-        xcrun xccov view --report DerivedData/Logs/Test/*.xcresult
-    
-    - name: Upload Coverage
-      uses: actions/upload-artifact@v4
-      with:
-        name: coverage-macos
-        path: coverage.json
 
   documentation:
     name: Build Documentation
@@ -139,13 +201,6 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Build Documentation
-      run: |
-        xcodebuild docbuild \
-          -scheme BackgroundTime \
-          -destination "platform=macOS" \
-          -derivedDataPath DerivedData
-    
-    - name: Process Documentation for Static Hosting
       run: |
         swift package --allow-writing-to-directory docs \
           generate-documentation --target BackgroundTime \
@@ -171,4 +226,4 @@ jobs:
       run: brew install swiftlint
     
     - name: Run SwiftLint
-      run: swiftlint lint --strict
+      run: swiftlint lint --strict --config .swiftlint.yml
