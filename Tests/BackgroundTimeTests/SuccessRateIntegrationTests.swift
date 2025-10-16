@@ -90,7 +90,7 @@ struct SuccessRateIntegrationTests {
         // Test 1: Data Store Statistics
         let dataStoreStats = dataStore.generateStatistics()
         #expect(dataStoreStats.totalTasksExecuted == 10, "Data store should report 10 executed tasks")
-        #expect(dataStoreStats.totalTasksCompleted == 9, "Data store should report 9 completed tasks")
+        #expect(dataStoreStats.totalTasksCompleted == 7, "Data store should report 7 successfully completed tasks")
         #expect(dataStoreStats.totalTasksFailed == 3, "Data store should report 3 failed tasks (2 failed + 1 expired)")
         #expect(dataStoreStats.totalTasksExpired == 1, "Data store should report 1 expired task")
         
@@ -193,7 +193,7 @@ struct SuccessRateIntegrationTests {
         
         // Should infer execution count from completion events
         #expect(edgeCaseStats.totalTasksExecuted == 2, "Should infer 2 executed tasks from completion events")
-        #expect(edgeCaseStats.totalTasksCompleted == 2, "Should report 2 completed tasks")
+        #expect(edgeCaseStats.totalTasksCompleted == 1, "Should report 1 successfully completed task")
         #expect(edgeCaseStats.totalTasksFailed == 1, "Should report 1 failed task")
         
         // Expected success rate: 1 successful out of 2 executed = 50%
@@ -350,7 +350,7 @@ struct SuccessRateIntegrationTests {
         // - task-4 direct failure shouldn't count as executed since no start event
         
         #expect(mixedStats.totalTasksExecuted == 3, "Should count 3 executed tasks (with start events)")
-        #expect(mixedStats.totalTasksCompleted == 2, "Should count 2 completed tasks (successful + failed completion)")
+        #expect(mixedStats.totalTasksCompleted == 1, "Should count 1 successfully completed task")
         #expect(mixedStats.totalTasksFailed == 3, "Should count 3 failed tasks (1 failed completion + 1 expired + 1 direct failure)")
         #expect(mixedStats.totalTasksExpired == 1, "Should count 1 expired task")
         #expect(mixedStats.totalTasksScheduled == 2, "Should count 2 scheduled tasks")

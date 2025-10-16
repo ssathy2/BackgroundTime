@@ -502,6 +502,7 @@ public struct TaskMetricsSummary: Codable {
         totalTasksScheduled: Int,
         totalTasksExecuted: Int,
         totalTasksCompleted: Int,
+        totalTasksSuccessful: Int, // Add this parameter
         totalTasksFailed: Int,
         totalTasksExpired: Int,
         averageExecutionDuration: TimeInterval,
@@ -521,9 +522,7 @@ public struct TaskMetricsSummary: Codable {
         
         // Calculate success rate: successful completions / total executed attempts
         if totalTasksExecuted > 0 {
-            // Successful completions = total completed - failed completions
-            let successfulCompletions = max(0, totalTasksCompleted - (totalTasksFailed - totalTasksExpired))
-            self.successRate = Double(successfulCompletions) / Double(totalTasksExecuted)
+            self.successRate = Double(totalTasksSuccessful) / Double(totalTasksExecuted)
         } else {
             self.successRate = 0.0
         }

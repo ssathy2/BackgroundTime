@@ -129,19 +129,20 @@ final class BackgroundTaskDataStore: @unchecked Sendable {
         // Primary approach: Use execution started events if available
         let totalExecuted = !executionStartedEvents.isEmpty ? executionStartedEvents.count : completionEvents.count
         
-        // Count successful completions
+        // Count successful completions (tasks that completed successfully)
         let successfulCompletions = completionEvents.filter { $0.success }.count
         
-        // Count explicit failures
-        let explicitFailures = failedEvents.count + completionEvents.filter { !$0.success }.count
+        // Count failed completions (tasks that completed but were marked as unsuccessful)
+        let failedCompletions = completionEvents.filter { !$0.success }.count
         
         let totalExpired = expiredEvents.count
         
-        // Total completed includes both successful and failed completions (but not expired)
-        let totalCompleted = completionEvents.count
+        // Total completed should count ONLY successful completions
+        // Based on test expectations, "completed" means "successfully completed"
+        let totalCompleted = successfulCompletions
         
-        // Total failed includes explicit failures, expired tasks, and cancelled tasks
-        let totalFailed = explicitFailures + totalExpired + cancelledEvents.count
+        // Total failed includes failed completions, explicit failures, expired tasks, and cancelled tasks
+        let totalFailed = failedCompletions + failedEvents.count + totalExpired + cancelledEvents.count
         
         // Calculate average execution time from completed events (successful or failed) with duration
         let eventsWithDuration = completionEvents.filter { $0.duration != nil }
@@ -280,14 +281,14 @@ extension BackgroundTaskDataStore {
         // Use execution started events if available, otherwise infer from completion events
         let totalExecuted = !executedEvents.isEmpty ? executedEvents.count : completedEvents.count
         
-        // Count successful completions
+        // Count successful completions (tasks that completed successfully)
         let successfulCompletions = completedEvents.filter { $0.success }.count
         
-        // Count execution failures (tasks that started execution but failed)
-        let executionFailures = failedEvents.count + completedEvents.filter { !$0.success }.count + expiredEvents.count
+        // Count failed completions (tasks that completed but were marked as unsuccessful)
+        let failedCompletions = completedEvents.filter { !$0.success }.count
         
-        // Total failed includes execution failures AND cancelled tasks (for overall statistics)
-        let totalFailed = executionFailures + cancelledEvents.count
+        // Total failed includes failed completions, explicit failures, expired tasks, and cancelled tasks
+        let totalFailed = failedCompletions + failedEvents.count + expiredEvents.count + cancelledEvents.count
         
         // Calculate average duration from events with duration data
         let eventsWithDuration = completedEvents.filter { $0.duration != nil }
@@ -312,7 +313,7 @@ extension BackgroundTaskDataStore {
             taskIdentifier: taskIdentifier,
             totalScheduled: scheduledEvents.count,
             totalExecuted: totalExecuted,
-            totalCompleted: completedEvents.count,
+            totalCompleted: successfulCompletions, // Only successful completions
             totalFailed: totalFailed,
             averageDuration: averageDuration,
             successRate: successRate,

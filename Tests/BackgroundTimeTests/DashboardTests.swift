@@ -34,6 +34,7 @@ struct DashboardTests {
         #expect(DashboardTab.timeline.title == "Timeline", "Timeline tab should have correct title")
         #expect(DashboardTab.performance.title == "Performance", "Performance tab should have correct title")
         #expect(DashboardTab.errors.title == "Errors", "Errors tab should have correct title")
+        #expect(DashboardTab.analysis.title == "Analysis", "Analysis tab should have correct title")
         #expect(DashboardTab.continuousTasks.title == "Continuous", "Continuous tasks tab should have correct title")
         
         // Test system images
@@ -41,22 +42,24 @@ struct DashboardTests {
         #expect(DashboardTab.timeline.systemImage == "clock.fill", "Timeline should have correct icon")
         #expect(DashboardTab.performance.systemImage == "speedometer", "Performance should have correct icon")
         #expect(DashboardTab.errors.systemImage == "exclamationmark.triangle.fill", "Errors should have correct icon")
+        #expect(DashboardTab.analysis.systemImage == "lightbulb.fill", "Analysis should have correct icon")
         #expect(DashboardTab.continuousTasks.systemImage == "infinity.circle.fill", "Continuous tasks should have correct icon")
     }
     
     @Test("Dashboard Tab Availability")
     func testDashboardTabAvailability() async throws {
         let legacyTabs = DashboardTab.allCasesForLegacyOS
-        #expect(legacyTabs.count == 4, "Legacy OS should have 4 tabs")
+        #expect(legacyTabs.count == 5, "Legacy OS should have 5 tabs")
         #expect(legacyTabs.contains(.overview), "Legacy should include overview")
         #expect(legacyTabs.contains(.timeline), "Legacy should include timeline")
         #expect(legacyTabs.contains(.performance), "Legacy should include performance")
         #expect(legacyTabs.contains(.errors), "Legacy should include errors")
+        #expect(legacyTabs.contains(.analysis), "Legacy should include analysis")
         #expect(!legacyTabs.contains(.continuousTasks), "Legacy should not include continuous tasks")
         
         if #available(iOS 26.0, *) {
             let currentTabs = DashboardTab.allCasesForCurrentOS
-            #expect(currentTabs.count == 5, "Current OS should have 5 tabs")
+            #expect(currentTabs.count == 6, "Current OS should have 6 tabs")
             #expect(currentTabs.contains(.continuousTasks), "Current OS should include continuous tasks")
         }
     }
@@ -165,6 +168,13 @@ struct DashboardTests {
         let viewModel = DashboardViewModel()
         let _ = ErrorsTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
         #expect(true, "ErrorsTabView should be created successfully")
+    }
+    
+    @Test("AnalysisTabView Component")
+    func testAnalysisTabViewComponent() async throws {
+        let viewModel = DashboardViewModel()
+        let _ = AnalysisTabView(viewModel: viewModel, selectedTimeRange: .last24Hours)
+        #expect(true, "AnalysisTabView should be created successfully")
     }
     
     // MARK: - Continuous Tasks Tab Tests (iOS 26.0+)

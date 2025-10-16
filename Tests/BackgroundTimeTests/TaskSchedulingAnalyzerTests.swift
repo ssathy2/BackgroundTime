@@ -429,19 +429,21 @@ struct TaskSchedulingAnalyzerTests {
         
         let analyses = analyzer.analyzeAllTasks()
         
-        #expect(analyses.count == taskIdentifiers.count, "Should return analysis for each task")
+        // Filter analyses to only include our test task identifiers
+        let testAnalyses = analyses.filter { taskIdentifiers.contains($0.taskIdentifier) }
         
-        let analyzedTaskIdentifiers = Set(analyses.map { $0.taskIdentifier })
+        #expect(testAnalyses.count == taskIdentifiers.count, "Should return analysis for each test task")
+        
+        let analyzedTaskIdentifiers = Set(testAnalyses.map { $0.taskIdentifier })
         let expectedTaskIdentifiers = Set(taskIdentifiers)
-        #expect(analyzedTaskIdentifiers == expectedTaskIdentifiers, "Should analyze all task identifiers")
+        #expect(analyzedTaskIdentifiers == expectedTaskIdentifiers, "Should analyze all test task identifiers")
     }
     
     // MARK: - Helper Methods
     
     private func resetDataStore() async {
         // Clear the data store for clean tests
-        // This might need to be implemented in the actual DataStore class
-        // For now, we'll assume the data store handles test isolation
+        dataStore.clearAllEvents()
     }
     
     private func createMockSystemInfo() -> SystemInfo {

@@ -211,7 +211,7 @@ struct TaskStatisticsEventFilterTests {
         // Verify that only task statistics events are counted
         #expect(metrics.totalScheduled == 1, "Should count only task scheduled events")
         #expect(metrics.totalExecuted == 2, "Should count only task execution events")
-        #expect(metrics.totalCompleted == 2, "Should count only task completion events")
+        #expect(metrics.totalCompleted == 1, "Should count only successful task completion events")
         #expect(metrics.totalFailed == 1, "Should count only failed task executions")
         
         // Verify success rate calculation

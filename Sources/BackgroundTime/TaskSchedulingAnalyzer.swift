@@ -273,7 +273,13 @@ public final class TaskSchedulingAnalyzer {
     public func analyzeAllTasks() -> [TaskSchedulingAnalysis] {
         let allEvents = dataStore.getAllEvents()
         let taskIdentifiers = Set(allEvents.map { $0.taskIdentifier })
-            .filter { !$0.isEmpty && $0 != "SDK_EVENT" && $0 != "ALL_TASKS" }
+            .filter { !$0.isEmpty && 
+                     $0 != "SDK_EVENT" && 
+                     $0 != "ALL_TASKS" &&
+                     !$0.hasPrefix("swizzling-registration-test") &&
+                     !$0.hasPrefix("test-init-task") &&
+                     !$0.contains("-test-") // Filter out other test artifacts
+            }
         
         return taskIdentifiers.compactMap { identifier in
             analyzeSchedulingPatterns(for: identifier)

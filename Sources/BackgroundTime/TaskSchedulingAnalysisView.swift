@@ -20,40 +20,33 @@ public struct TaskSchedulingAnalysisView: View {
     }
     
     public var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Tab Bar
-                Picker("Analysis Tab", selection: $selectedTab) {
-                    Text("Overview").tag(0)
-                    Text("Timing").tag(1)
-                    Text("Recommendations").tag(2)
-                }
-                .pickerStyle(SegmentedPickerStyle())
-                .padding()
-                .background(Color(.systemBackground))
-                
-                // Content
-                Group {
-                    if selectedTab == 0 {
-                        AnalysisOverviewTabView(analysis: analysis)
-                    } else if selectedTab == 1 {
-                        TimingAnalysisTabView(analysis: analysis)
-                    } else {
-                        RecommendationsTabView(recommendations: analysis.optimizationRecommendations)
-                    }
-                }
-                .animation(.easeInOut(duration: 0.2), value: selectedTab)
+        VStack(spacing: 0) {
+            // Tab Bar - Fixed spacing and padding
+            Picker("Analysis Tab", selection: $selectedTab) {
+                Text("Overview").tag(0)
+                Text("Timing").tag(1)
+                Text("Recommendations").tag(2)
             }
-            .navigationTitle("Task: \(truncatedTaskIdentifier)")
-            .navigationBarTitleDisplayMode(.inline)
+            .pickerStyle(SegmentedPickerStyle())
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color(.systemBackground))
+            
+            // Content
+            Group {
+                if selectedTab == 0 {
+                    AnalysisOverviewTabView(analysis: analysis)
+                } else if selectedTab == 1 {
+                    TimingAnalysisTabView(analysis: analysis)
+                } else {
+                    RecommendationsTabView(recommendations: analysis.optimizationRecommendations)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: selectedTab)
         }
-    }
-    
-    private var truncatedTaskIdentifier: String {
-        if analysis.taskIdentifier.count > 30 {
-            return String(analysis.taskIdentifier.prefix(27)) + "..."
-        }
-        return analysis.taskIdentifier
+        .navigationTitle(analysis.taskIdentifier)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Color(.systemBackground), for: .navigationBar)
     }
 }
 
@@ -291,7 +284,7 @@ private struct OptimalTimeWindowsChart: View {
             if timeWindowData.isEmpty {
                 Text("No time window data available")
                     .foregroundColor(.secondary)
-                    .frame(height: 200)
+                    .frame(height: 220)
                     .frame(maxWidth: .infinity)
             } else {
                 Chart(timeWindowData, id: \.0) { item in
@@ -301,7 +294,8 @@ private struct OptimalTimeWindowsChart: View {
                     )
                     .foregroundStyle(.blue)
                 }
-                .frame(height: 200)
+                .frame(height: 220) // Increased height for better label visibility
+                .padding(.bottom, 20) // Extra padding for rotated labels
                 .chartYAxis {
                     AxisMarks { value in
                         AxisGridLine()
@@ -309,6 +303,7 @@ private struct OptimalTimeWindowsChart: View {
                         AxisValueLabel {
                             if let timeValue = value.as(Double.self) {
                                 Text(formatTimeInterval(timeValue))
+                                    .font(.caption2)
                             }
                         }
                     }
@@ -318,18 +313,19 @@ private struct OptimalTimeWindowsChart: View {
                     AxisMarks { value in
                         AxisGridLine()
                         AxisTick()
-                        AxisValueLabel {
+                        AxisValueLabel(anchor: .topLeading) { // Better anchor for rotated text
                             if let stringValue = value.as(String.self) {
                                 Text(stringValue)
                                     .font(.caption2)
                                     .rotationEffect(Angle.degrees(-45))
+                                    .fixedSize()
                             }
                         }
                     }
                 }
             }
         }
-        .padding()
+        .padding(16)
         .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
@@ -383,7 +379,7 @@ private struct PropertyComparisonChart: View {
             if comparisonData.isEmpty {
                 Text("No property data available")
                     .foregroundColor(.secondary)
-                    .frame(height: 200)
+                    .frame(height: 220)
                     .frame(maxWidth: .infinity)
             } else {
                 Chart(comparisonData, id: \.0) { item in
@@ -393,7 +389,8 @@ private struct PropertyComparisonChart: View {
                     )
                     .foregroundStyle(colorForProperty(item.0))
                 }
-                .frame(height: 200)
+                .frame(height: 220) // Increased height for better label visibility
+                .padding(.horizontal, 8) // Extra horizontal padding
                 .chartYAxis {
                     AxisMarks { value in
                         AxisGridLine()
@@ -401,6 +398,20 @@ private struct PropertyComparisonChart: View {
                         AxisValueLabel {
                             if let timeValue = value.as(Double.self) {
                                 Text(formatTimeInterval(timeValue))
+                                    .font(.caption2)
+                            }
+                        }
+                    }
+                }
+                .chartXAxis {
+                    AxisMarks { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel {
+                            if let stringValue = value.as(String.self) {
+                                Text(stringValue)
+                                    .font(.caption)
+                                    .fixedSize()
                             }
                         }
                     }
@@ -408,7 +419,7 @@ private struct PropertyComparisonChart: View {
                 .chartYScale(domain: 0...maxDelayValue)
             }
         }
-        .padding()
+        .padding(16)
         .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
@@ -579,27 +590,37 @@ public struct TaskSchedulingOverviewView: View {
     }
     
     public var body: some View {
-        NavigationView {
-            List {
-                if analyses.isEmpty {
-                    Text("No task scheduling data available")
-                        .foregroundColor(.secondary)
-                        .padding()
-                } else {
-                    ForEach(analyses, id: \.taskIdentifier) { analysis in
-                        TaskSummaryRow(analysis: analysis)
-                            .onTapGesture {
-                                selectedTask = analysis
-                            }
-                    }
+        List {
+            if analyses.isEmpty {
+                Text("No task scheduling data available")
+                    .foregroundColor(.secondary)
+                    .padding()
+            } else {
+                ForEach(analyses, id: \.taskIdentifier) { analysis in
+                    TaskSummaryRow(analysis: analysis)
+                        .contentShape(Rectangle()) // Makes entire row tappable
+                        .onTapGesture {
+                            selectedTask = analysis
+                        }
                 }
             }
-            .navigationTitle("Task Scheduling Analysis")
-            .sheet(item: Binding<TaskSchedulingAnalysis?>(
-                get: { selectedTask },
-                set: { selectedTask = $0 }
-            )) { analysis in
+        }
+        .navigationTitle("Task Scheduling Analysis")
+        .navigationBarTitleDisplayMode(.large)
+        .sheet(item: Binding<TaskSchedulingAnalysis?>(
+            get: { selectedTask },
+            set: { selectedTask = $0 }
+        )) { analysis in
+            NavigationView {
                 TaskSchedulingAnalysisView(analysis: analysis)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("Done") {
+                                selectedTask = nil
+                            }
+                        }
+                    }
             }
         }
     }
@@ -611,9 +632,11 @@ private struct TaskSummaryRow: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
+            HStack(alignment: .top) {
                 Text(analysis.taskIdentifier)
                     .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(2)
                 
                 Spacer()
                 
@@ -645,6 +668,6 @@ private struct TaskSummaryRow: View {
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
     }
 }

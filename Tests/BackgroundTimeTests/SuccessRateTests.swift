@@ -55,7 +55,7 @@ struct SuccessRateTests {
         let statistics = dataStore.generateStatistics()
         
         #expect(statistics.totalTasksExecuted == 1, "Should have 1 executed task")
-        #expect(statistics.totalTasksCompleted == 1, "Should have 1 completed task")
+        #expect(statistics.totalTasksCompleted == 0, "Should have 0 successfully completed tasks")
         #expect(statistics.totalTasksFailed == 1, "Should have 1 failed task")
         #expect(statistics.successRate == 0.0, "Success rate should be 0% (0.0)")
     }
@@ -96,7 +96,7 @@ struct SuccessRateTests {
         let statistics = dataStore.generateStatistics()
         
         #expect(statistics.totalTasksExecuted == 5, "Should have 5 executed tasks")
-        #expect(statistics.totalTasksCompleted == 5, "Should have 5 completed tasks")
+        #expect(statistics.totalTasksCompleted == 3, "Should have 3 successfully completed tasks")
         #expect(statistics.totalTasksFailed == 2, "Should have 2 failed tasks")
         
         // Expected success rate: 3 successful / 5 executed = 0.6 (60%)
@@ -139,7 +139,7 @@ struct SuccessRateTests {
         let statistics = dataStore.generateStatistics()
         
         #expect(statistics.totalTasksExecuted == 5, "Should have 5 executed tasks")
-        #expect(statistics.totalTasksCompleted == 3, "Should have 3 completed tasks (2 successful + 1 failed, not counting expired)")
+        #expect(statistics.totalTasksCompleted == 2, "Should have 2 successfully completed tasks (not counting expired)")
         #expect(statistics.totalTasksFailed == 3, "Should have 3 failed tasks (1 failed + 2 expired)")
         #expect(statistics.totalTasksExpired == 2, "Should have 2 expired tasks")
         
@@ -205,7 +205,7 @@ struct SuccessRateTests {
         
         // When no execution start events exist, fallback to using completion events as executed count
         #expect(statistics.totalTasksExecuted == 3, "Should infer 3 executed tasks from completion events")
-        #expect(statistics.totalTasksCompleted == 3, "Should have 3 completed tasks")
+        #expect(statistics.totalTasksCompleted == 2, "Should have 2 successfully completed tasks")
         #expect(statistics.totalTasksFailed == 1, "Should have 1 failed task")
         
         // Expected success rate: 2 successful / 3 executed = 0.667 (66.7%)
@@ -254,7 +254,7 @@ struct SuccessRateTests {
         guard let metrics = taskMetrics else { return }
         
         #expect(metrics.totalExecuted == 5, "Should have 5 executed instances")
-        #expect(metrics.totalCompleted == 5, "Should have 5 completed instances")
+        #expect(metrics.totalCompleted == 3, "Should have 3 successfully completed instances")
         #expect(metrics.totalFailed == 2, "Should have 2 failed instances")
         
         // Expected success rate: 3 successful / 5 executed = 0.6 (60%)
@@ -293,7 +293,7 @@ struct SuccessRateTests {
         guard let metrics = taskMetrics else { return }
         
         #expect(metrics.totalExecuted == 3, "Should have 3 executed instances")
-        #expect(metrics.totalCompleted == 2, "Should have 2 completed instances (1 successful + 1 failed, not counting expired)")
+        #expect(metrics.totalCompleted == 1, "Should have 1 successfully completed instance (not counting expired)")
         #expect(metrics.totalFailed == 2, "Should have 2 failed instances (1 failed + 1 expired)")
         
         // Expected success rate: 1 successful / 3 executed = 0.333... (33.3%)
@@ -343,7 +343,7 @@ struct SuccessRateTests {
         guard let stats = viewModel.statistics else { return }
         
         #expect(stats.totalTasksExecuted == 5, "Dashboard should show 5 executed tasks")
-        #expect(stats.totalTasksCompleted == 4, "Dashboard should show 4 completed tasks (3 successful + 1 failed, not counting expired)")
+        #expect(stats.totalTasksCompleted == 3, "Dashboard should show 3 successfully completed tasks (not counting expired)")
         #expect(stats.totalTasksFailed == 2, "Dashboard should show 2 failed tasks (1 failed + 1 expired)")
         
         // Expected success rate: 3 successful / 5 executed = 0.6 (60%)
@@ -406,7 +406,7 @@ struct SuccessRateTests {
         
         // Statistics should only reflect task statistics events
         #expect(statistics.totalTasksExecuted == 2, "Should count only task executions, not app lifecycle events")
-        #expect(statistics.totalTasksCompleted == 2, "Should count only task completions")
+        #expect(statistics.totalTasksCompleted == 1, "Should count only successful task completions")
         #expect(statistics.totalTasksFailed == 1, "Should count only task failures")
         
         // Expected success rate: 1 successful / 2 executed = 0.5 (50%)
@@ -483,6 +483,7 @@ struct SuccessRateTests {
             totalTasksScheduled: 0, // Not testing scheduling
             totalTasksExecuted: statistics.totalTasksExecuted,
             totalTasksCompleted: statistics.totalTasksCompleted,
+            totalTasksSuccessful: statistics.totalTasksCompleted, // In new interpretation, completed = successful
             totalTasksFailed: statistics.totalTasksFailed,
             totalTasksExpired: statistics.totalTasksExpired,
             averageExecutionDuration: statistics.averageExecutionTime,
@@ -492,17 +493,17 @@ struct SuccessRateTests {
         )
         
         #expect(statistics.totalTasksExecuted == 12, "Should have 12 executed tasks")
-        #expect(statistics.totalTasksCompleted == 10, "Should have 10 completed tasks (7 successful + 3 failed)")
+        #expect(statistics.totalTasksCompleted == 7, "Should have 7 successfully completed tasks")
         #expect(statistics.totalTasksFailed == 5, "Should have 5 failed tasks (3 failed + 2 expired)")
         #expect(statistics.totalTasksExpired == 2, "Should have 2 expired tasks")
         
         // Expected success rate: 7 successful / 12 executed = 0.583... (58.3%)
         let expectedSuccessRate = 7.0 / 12.0
         #expect(abs(statistics.successRate - expectedSuccessRate) < 0.001, 
-               "Statistics success rate should be ~58.3% (7/12), got \(statistics.successRate)")
+               "Statistics success rate should be ~58.3% (7/12), got \(String(statistics.successRate))")
         
         #expect(abs(taskMetricsSummary.successRate - expectedSuccessRate) < 0.001,
-               "Task metrics summary success rate should be ~58.3% (7/12), got \(taskMetricsSummary.successRate)")
+               "Task metrics summary success rate should be ~58.3% (7/12), got \(String(taskMetricsSummary.successRate))")
     }
     
     // MARK: - Test Helper Functions
