@@ -540,6 +540,14 @@ private class SystemResourceMonitor {
     private let logger = Logger(subsystem: "BackgroundTime", category: "SystemResources")
     private var activeMonitoring: [String: SystemMonitoringSession] = [:]
     private var continuousMonitoringTimer: Timer?
+    private let isTestEnvironment: Bool
+    
+    init() {
+        // Detect test environment
+        self.isTestEnvironment = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
+                                NSClassFromString("XCTestCase") != nil ||
+                                ProcessInfo.processInfo.arguments.contains("--test")
+    }
     
     func startMonitoring(for taskIdentifier: String) {
         let session = SystemMonitoringSession()
@@ -555,6 +563,12 @@ private class SystemResourceMonitor {
     }
     
     func startContinuousMonitoring() {
+        // Skip continuous monitoring during tests
+        guard !isTestEnvironment else {
+            logger.info("Skipping continuous system monitoring in test environment")
+            return
+        }
+        
         continuousMonitoringTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
             self?.logSystemResources()
         }
@@ -572,6 +586,9 @@ private class SystemResourceMonitor {
     }
     
     private func logSystemResources() {
+        // Skip logging during tests
+        guard !isTestEnvironment else { return }
+        
         let metrics = getCurrentSystemMetrics()
         
         if metrics.availableMemoryPercentage < 10 {
