@@ -36,20 +36,9 @@ jobs:
     - name: List Available Schemes
       run: xcodebuild -project BackgroundTime.xcodeproj -list
     
-    - name: Build for Testing
+    - name: Build and Test
       run: |
-        xcodebuild build-for-testing \
-          -project BackgroundTime.xcodeproj \
-          -scheme BackgroundTimeExample \
-          -destination "${{ matrix.destination }}" \
-          -derivedDataPath DerivedData \
-          -enableCodeCoverage YES \
-          CODE_SIGNING_ALLOWED=NO \
-          | xcpretty && exit ${PIPESTATUS[0]}
-    
-    - name: Run Tests
-      run: |
-        xcodebuild test-without-building \
+        xcodebuild test \
           -project BackgroundTime.xcodeproj \
           -scheme BackgroundTimeExample \
           -testPlan BackgroundTimeExample \
@@ -70,8 +59,8 @@ jobs:
     - name: Generate Code Coverage Report
       if: matrix.destination == 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.1'
       run: |
-        xcrun xccov view --report --json DerivedData/Logs/Test/*.xcresult > coverage.json
-        xcrun xccov view --report DerivedData/Logs/Test/*.xcresult
+        xcrun xccov view --report --json TestResults.xcresult > coverage.json
+        xcrun xccov view --report TestResults.xcresult
     
     - name: Upload Coverage
       if: matrix.destination == 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.1'
@@ -89,9 +78,11 @@ jobs:
           - scheme: BackgroundTimeSDK
             destination: "platform=iOS Simulator,name=iPhone 16 Pro,OS=18.1"
             testplan: BackgroundTimeSDK
+            name: iOS
           - scheme: BackgroundTimeSDK
             destination: "platform=macOS"
             testplan: BackgroundTimeSDK
+            name: macOS
     
     steps:
     - uses: actions/checkout@v4
@@ -107,20 +98,9 @@ jobs:
     - name: Resolve Swift Package Dependencies
       run: xcodebuild -resolvePackageDependencies -project BackgroundTime.xcodeproj
     
-    - name: Build for Testing
+    - name: Build and Test
       run: |
-        xcodebuild build-for-testing \
-          -project BackgroundTime.xcodeproj \
-          -scheme ${{ matrix.platform.scheme }} \
-          -destination "${{ matrix.platform.destination }}" \
-          -derivedDataPath DerivedData \
-          -enableCodeCoverage YES \
-          CODE_SIGNING_ALLOWED=NO \
-          | xcpretty && exit ${PIPESTATUS[0]}
-    
-    - name: Run Tests
-      run: |
-        xcodebuild test-without-building \
+        xcodebuild test \
           -project BackgroundTime.xcodeproj \
           -scheme ${{ matrix.platform.scheme }} \
           -testPlan ${{ matrix.platform.testplan }} \
@@ -135,18 +115,18 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test-results-sdk-${{ strategy.job-index }}
+        name: test-results-sdk-${{ matrix.platform.name }}
         path: TestResults.xcresult
     
     - name: Generate Code Coverage Report
       run: |
-        xcrun xccov view --report --json DerivedData/Logs/Test/*.xcresult > coverage.json
-        xcrun xccov view --report DerivedData/Logs/Test/*.xcresult
+        xcrun xccov view --report --json TestResults.xcresult > coverage.json
+        xcrun xccov view --report TestResults.xcresult
     
     - name: Upload Coverage
       uses: actions/upload-artifact@v4
       with:
-        name: coverage-sdk-${{ strategy.job-index }}
+        name: coverage-sdk-${{ matrix.platform.name }}
         path: coverage.json
 
   test-ui:
@@ -164,19 +144,9 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-derived-data-
     
-    - name: Build for Testing
+    - name: Build and Run UI Tests
       run: |
-        xcodebuild build-for-testing \
-          -project BackgroundTime.xcodeproj \
-          -scheme BackgroundTimeExample \
-          -destination "platform=iOS Simulator,name=iPhone 16 Pro,OS=18.1" \
-          -derivedDataPath DerivedData \
-          CODE_SIGNING_ALLOWED=NO \
-          | xcpretty && exit ${PIPESTATUS[0]}
-    
-    - name: Run UI Tests
-      run: |
-        xcodebuild test-without-building \
+        xcodebuild test \
           -project BackgroundTime.xcodeproj \
           -scheme BackgroundTimeExample \
           -only-testing:BackgroundTimeExampleUITests \
