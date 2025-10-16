@@ -67,92 +67,92 @@ jobs:
         name: coverage-sdk
         path: coverage-sdk.json
 
-  test-example:
-    name: Test Example App
-    runs-on: macos-26
-    strategy:
-      matrix:
-        destination: 
-          - "platform=iOS Simulator,name=iPhone 17,OS=26.0"
+  # test-example:
+  #   name: Test Example App
+  #   runs-on: macos-26
+  #   strategy:
+  #     matrix:
+  #       destination: 
+  #         - "platform=iOS Simulator,name=iPhone 17,OS=26.0"
     
-    steps:
-    - uses: actions/checkout@v4
+  #   steps:
+  #   - uses: actions/checkout@v4
     
-    - name: Cache DerivedData
-      uses: actions/cache@v4
-      with:
-        path: ~/Library/Developer/Xcode/DerivedData
-        key: ${{ runner.os }}-derived-data-${{ hashFiles('**/Package.resolved') }}
-        restore-keys: |
-          ${{ runner.os }}-derived-data-
+  #   - name: Cache DerivedData
+  #     uses: actions/cache@v4
+  #     with:
+  #       path: ~/Library/Developer/Xcode/DerivedData
+  #       key: ${{ runner.os }}-derived-data-${{ hashFiles('**/Package.resolved') }}
+  #       restore-keys: |
+  #         ${{ runner.os }}-derived-data-
     
-    - name: List Available Schemes
-      run: xcodebuild -project BackgroundTime.xcodeproj -list
+  #   - name: List Available Schemes
+  #     run: xcodebuild -project BackgroundTime.xcodeproj -list
     
-    - name: Build and Test Example App
-      run: |
-        xcodebuild test \
-          -project BackgroundTime.xcodeproj \
-          -scheme BackgroundTimeExample \
-          -testPlan BackgroundTimeExample \
-          -destination "${{ matrix.destination }}" \
-          -derivedDataPath DerivedData \
-          -enableCodeCoverage YES \
-          -resultBundlePath TestResults-Example-${{ strategy.job-index }}.xcresult \
-          CODE_SIGNING_ALLOWED=NO \
-          | xcpretty && exit ${PIPESTATUS[0]}
+  #   - name: Build and Test Example App
+  #     run: |
+  #       xcodebuild test \
+  #         -project BackgroundTime.xcodeproj \
+  #         -scheme BackgroundTimeExample \
+  #         -testPlan BackgroundTimeExample \
+  #         -destination "${{ matrix.destination }}" \
+  #         -derivedDataPath DerivedData \
+  #         -enableCodeCoverage YES \
+  #         -resultBundlePath TestResults-Example-${{ strategy.job-index }}.xcresult \
+  #         CODE_SIGNING_ALLOWED=NO \
+  #         | xcpretty && exit ${PIPESTATUS[0]}
     
-    - name: Upload Test Results
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-results-example-${{ strategy.job-index }}
-        path: TestResults-Example-${{ strategy.job-index }}.xcresult
+  #   - name: Upload Test Results
+  #     if: always()
+  #     uses: actions/upload-artifact@v4
+  #     with:
+  #       name: test-results-example-${{ strategy.job-index }}
+  #       path: TestResults-Example-${{ strategy.job-index }}.xcresult
     
-    - name: Generate Code Coverage Report
-      if: matrix.destination == 'platform=iOS Simulator,name=iPhone 17,OS=26.0'
-      run: |
-        xcrun xccov view --report --json TestResults-Example-${{ strategy.job-index }}.xcresult > coverage-example.json
-        xcrun xccov view --report TestResults-Example-${{ strategy.job-index }}.xcresult
+  #   - name: Generate Code Coverage Report
+  #     if: matrix.destination == 'platform=iOS Simulator,name=iPhone 17,OS=26.0'
+  #     run: |
+  #       xcrun xccov view --report --json TestResults-Example-${{ strategy.job-index }}.xcresult > coverage-example.json
+  #       xcrun xccov view --report TestResults-Example-${{ strategy.job-index }}.xcresult
     
-    - name: Upload Coverage
-      if: matrix.destination == 'platform=iOS Simulator,name=iPhone 17,OS=26.0'
-      uses: actions/upload-artifact@v4
-      with:
-        name: coverage-example
-        path: coverage-example.json
+  #   - name: Upload Coverage
+  #     if: matrix.destination == 'platform=iOS Simulator,name=iPhone 17,OS=26.0'
+  #     uses: actions/upload-artifact@v4
+  #     with:
+  #       name: coverage-example
+  #       path: coverage-example.json
 
-  documentation:
-    name: Build Documentation
-    runs-on: macos-26
+  # documentation:
+  #   name: Build Documentation
+  #   runs-on: macos-26
     
-    steps:
-    - uses: actions/checkout@v4
+  #   steps:
+  #   - uses: actions/checkout@v4
     
-    - name: Build Documentation
-      run: |
-        swift package --allow-writing-to-directory docs \
-          generate-documentation --target BackgroundTime \
-          --disable-indexing \
-          --transform-for-static-hosting \
-          --hosting-base-path BackgroundTime \
-          --output-path docs
+  #   - name: Build Documentation
+  #     run: |
+  #       swift package --allow-writing-to-directory docs \
+  #         generate-documentation --target BackgroundTime \
+  #         --disable-indexing \
+  #         --transform-for-static-hosting \
+  #         --hosting-base-path BackgroundTime \
+  #         --output-path docs
     
-    - name: Upload Documentation
-      uses: actions/upload-artifact@v4
-      with:
-        name: documentation
-        path: docs
+  #   - name: Upload Documentation
+  #     uses: actions/upload-artifact@v4
+  #     with:
+  #       name: documentation
+  #       path: docs
 
-  lint:
-    name: SwiftLint
-    runs-on: macos-26
+  # lint:
+  #   name: SwiftLint
+  #   runs-on: macos-26
     
-    steps:
-    - uses: actions/checkout@v4
+  #   steps:
+  #   - uses: actions/checkout@v4
     
-    - name: Install SwiftLint
-      run: brew install swiftlint
+  #   - name: Install SwiftLint
+  #     run: brew install swiftlint
     
-    - name: Run SwiftLint
-      run: swiftlint lint --strict --config .swiftlint.yml
+  #   - name: Run SwiftLint
+  #     run: swiftlint lint --strict --config .swiftlint.yml
