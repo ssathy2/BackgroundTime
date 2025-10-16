@@ -18,7 +18,7 @@ jobs:
     strategy:
       matrix:
         destination: 
-          - 'platform:iOS Simulator, name:Any iOS Simulator Device'
+          - "platform:iOS Simulator, name:Any iOS Simulator Device"
     
     steps:
     - uses: actions/checkout@v4
@@ -61,7 +61,7 @@ jobs:
         xcrun xccov view --report TestResults-SDK-${{ strategy.job-index }}.xcresult
     
     - name: Upload Coverage
-      if: matrix.destination == 'platform:iOS Simulator, name:Any iOS Simulator Device'
+      if: matrix.destination == "platform:iOS Simulator, name:Any iOS Simulator Device"
       uses: actions/upload-artifact@v4
       with:
         name: coverage-sdk
@@ -73,7 +73,7 @@ jobs:
     strategy:
       matrix:
         destination: 
-          - 'platform:iOS Simulator, name:Any iOS Simulator Device'
+          - "platform:iOS Simulator, name:Any iOS Simulator Device"
     
     steps:
     - uses: actions/checkout@v4
