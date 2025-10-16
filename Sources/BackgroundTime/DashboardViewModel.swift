@@ -9,7 +9,7 @@ import Foundation
 import Combine
 
 @MainActor
-class DashboardViewModel: ObservableObject {
+public class DashboardViewModel: ObservableObject {
     @Published var statistics: BackgroundTaskStatistics?
     @Published var events: [BackgroundTaskEvent] = []
     @Published var timelineData: [TimelineDataPoint] = []

@@ -573,19 +573,6 @@ private struct StatisticView: View {
         }
     }
 }
-
-// MARK: - Helper Functions
-
-private func formatTimeInterval(_ interval: TimeInterval) -> String {
-    if interval < 60 {
-        return String(format: "%.1fs", interval)
-    } else if interval < 3600 {
-        return String(format: "%.1fm", interval / 60)
-    } else {
-        return String(format: "%.1fh", interval / 3600)
-    }
-}
-
 // MARK: - Convenience View for Multiple Tasks
 
 @available(iOS 16.0, *)
