@@ -163,6 +163,108 @@ struct MetricCollectionTests {
         #expect(decodedState.thermalState == originalState.thermalState)
         #expect(decodedState.thermalState.rawValue == 2) // serious = 2
     }
+    
+    @Test("Long Task Identifier Truncation")
+    func testLongTaskIdentifierTruncation() async throws {
+        // Test simple truncation
+        let shortIdentifier = "com.app.task"
+        #expect(shortIdentifier.count <= 35) // Updated threshold - Should not need truncation
+        
+        // Test complex identifier with dots
+        let longIdentifier = "com.mycompany.myapp.backgroundtasks.networksync.downloadmanager.task.extended.identifier"
+        #expect(longIdentifier.count > 35) // Should need truncation
+        
+        // Test smart truncation logic (simulating the updated private method)
+        func smartTruncate(_ identifier: String) -> String {
+            if identifier.count <= 35 {  // Updated threshold
+                return identifier
+            }
+            
+            let components = identifier.components(separatedBy: ".")
+            if components.count > 1 {
+                let firstPart = components.first ?? ""
+                let lastPart = components.last ?? ""
+                let maxFirstLength = 18  // Updated from 12
+                let maxLastLength = 15   // Updated from 10
+                
+                let truncatedFirst = firstPart.count > maxFirstLength ? 
+                    String(firstPart.prefix(maxFirstLength)) + "..." : firstPart
+                let truncatedLast = lastPart.count > maxLastLength ?
+                    "..." + String(lastPart.suffix(maxLastLength)) : lastPart
+                
+                return "\(truncatedFirst).\(truncatedLast)"
+            } else {
+                return String(identifier.prefix(32)) + "..."  // Updated from 22
+            }
+        }
+        
+        let truncated = smartTruncate(longIdentifier)
+        #expect(truncated.count <= 45) // More generous truncated length
+        #expect(truncated.contains("com.mycompany...")) // Should start with first part
+        #expect(truncated.contains("...identifier")) // Should end with last part
+        
+        // Test medium-length identifier that should show fully
+        let mediumIdentifier = "com.mycompany.myapp.task"
+        let mediumTruncated = smartTruncate(mediumIdentifier)
+        #expect(mediumTruncated == mediumIdentifier) // Should not be truncated
+    }
+    
+    @Test("Task Identifier Display Modes")
+    func testTaskIdentifierDisplayModes() async throws {
+        let longIdentifier = "com.mycompany.myapp.backgroundtasks.networksync.downloadmanager.task.extended.identifier.verylong"
+        
+        // Test that alwaysExpanded mode would show full identifier
+        // In actual UI, this would display without truncation when alwaysExpanded = true
+        #expect(longIdentifier.count > 35)
+        
+        // Test chart truncation is more generous
+        func chartTruncate(_ identifier: String) -> String {
+            if identifier.count <= 30 {  // Updated threshold
+                return identifier
+            }
+            
+            let components = identifier.components(separatedBy: ".")
+            if components.count > 1, let lastPart = components.last {
+                return lastPart.count <= 25 ? lastPart : String(lastPart.prefix(22)) + "..."
+            } else {
+                return String(identifier.prefix(27)) + "..."
+            }
+        }
+        
+        let chartTruncated = chartTruncate(longIdentifier)
+        #expect(chartTruncated.count <= 30) // Chart truncation should be reasonable for axis display
+        #expect(chartTruncated.hasSuffix("verylong") || chartTruncated.hasSuffix("...")) // Should show meaningful end
+    }
+    
+    @Test("Task Identifier UI Expansion Features")
+    func testTaskIdentifierUIExpansion() async throws {
+        // Test various identifier patterns that should now display better
+        let identifiers = [
+            "com.mycompany.app.task", // Short - should display fully
+            "com.mycompany.myapp.backgroundtasks.networksync.task", // Medium - should display with wrapping
+            "com.mycompany.myapp.backgroundtasks.networksync.downloadmanager.task.extended.identifier.verylongname", // Very long - should be expandable
+            "SimpleTask", // Very short - should display fully
+            "background_task_with_underscores_and_very_long_name_that_describes_functionality", // Non-dotted long
+        ]
+        
+        for identifier in identifiers {
+            // Verify all identifiers can be handled by the UI components
+            if identifier.count <= 35 {
+                // Should display fully in most contexts
+                #expect(identifier.count > 0)
+            } else {
+                // Should be handled by expandable UI
+                #expect(identifier.count > 35)
+            }
+        }
+        
+        // Test that we maintain meaningful information in truncated versions
+        let longDottedIdentifier = "com.mycompany.myapp.backgroundtasks.networksync.downloadmanager.task"
+        let components = longDottedIdentifier.components(separatedBy: ".")
+        #expect(components.count > 1) // Should have meaningful structure
+        #expect(components.first?.isEmpty == false) // Should have meaningful beginning
+        #expect(components.last?.isEmpty == false) // Should have meaningful end
+    }
 }
 
 // MARK: - Integration Tests

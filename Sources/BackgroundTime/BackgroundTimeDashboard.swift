@@ -1335,10 +1335,7 @@ struct TaskAnalysisRow: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(analysis.taskIdentifier)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .lineLimit(1)
+                    TaskIdentifierText(analysis.taskIdentifier, font: .subheadline, maxLines: 3, alwaysExpanded: true)
                     
                     Text("\(analysis.totalScheduledTasks) scheduled • \(Int(analysis.executionRate * 100))% success")
                         .font(.caption)
@@ -1602,7 +1599,7 @@ struct ContinuousTasksTabView: View {
                     ForEach(continuousEvents.prefix(20)) { event in
                         PointMark(
                             x: .value("Time", event.timestamp),
-                            y: .value("Task", event.taskIdentifier)
+                            y: .value("Task", truncateForChart(event.taskIdentifier))
                         )
                         .foregroundStyle(colorForEventType(event.type))
                     }
@@ -1649,6 +1646,21 @@ struct ContinuousTasksTabView: View {
         default: return .gray
         }
     }
+    
+    /// Truncates task identifiers for display in charts where space is limited
+    private func truncateForChart(_ identifier: String) -> String {
+        if identifier.count <= 30 {  // Increased from 20
+            return identifier
+        }
+        
+        // For charts, use moderate truncation to show more information
+        let components = identifier.components(separatedBy: ".")
+        if components.count > 1, let lastPart = components.last {
+            return lastPart.count <= 25 ? lastPart : String(lastPart.prefix(22)) + "..."
+        } else {
+            return String(identifier.prefix(27)) + "..."
+        }
+    }
 }
 
 @available(iOS 26.0, *)
@@ -1663,9 +1675,7 @@ struct ContinuousTaskRow: View {
                     .fill(currentStatus.color)
                     .frame(width: 8, height: 8)
                 
-                Text(taskIdentifier)
-                    .font(.caption)
-                    .fontWeight(.medium)
+                TaskIdentifierText(taskIdentifier, font: .caption, maxLines: 3, alwaysExpanded: true)
                 
                 Spacer()
                 
@@ -1732,9 +1742,7 @@ struct ContinuousTaskPerformanceCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(taskIdentifier)
-                .font(.subheadline)
-                .fontWeight(.medium)
+            TaskIdentifierText(taskIdentifier, font: .subheadline, maxLines: 3, alwaysExpanded: true)
             
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 8) {
                 MetricRow(label: "Events", value: "\(events.count)")
@@ -1790,6 +1798,146 @@ enum ContinuousTaskDisplayStatus {
 
 // MARK: - Supporting Views
 
+/// A view that displays task identifiers with full expansion by default and smart wrapping
+struct TaskIdentifierText: View {
+    let taskIdentifier: String
+    let font: Font
+    let maxLines: Int?
+    let showFullInTooltip: Bool
+    let alwaysExpanded: Bool
+    @State private var isExpanded = false
+    
+    init(_ taskIdentifier: String, font: Font = .caption, maxLines: Int? = 3, showFullInTooltip: Bool = true, alwaysExpanded: Bool = false) {
+        self.taskIdentifier = taskIdentifier
+        self.font = font
+        self.maxLines = maxLines
+        self.showFullInTooltip = showFullInTooltip
+        self.alwaysExpanded = alwaysExpanded
+    }
+    
+    var body: some View {
+        if alwaysExpanded {
+            // Always show full identifier with wrapping
+            Text(taskIdentifier)
+                .font(font)
+                .fontWeight(.medium)
+                .lineLimit(nil)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .contextMenu {
+                    Button(action: {
+                        UIPasteboard.general.string = taskIdentifier
+                    }) {
+                        Label("Copy Identifier", systemImage: "doc.on.doc")
+                    }
+                }
+                .help(taskIdentifier)
+        } else if showFullInTooltip && taskIdentifier.count > 35 {
+            // For very long identifiers, show expandable with context menu
+            Text(isExpanded ? taskIdentifier : truncatedIdentifier)
+                .font(font)
+                .fontWeight(.medium)
+                .lineLimit(isExpanded ? nil : maxLines)
+                .multilineTextAlignment(.leading)
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isExpanded.toggle()
+                    }
+                }
+                .contextMenu {
+                    Button(action: {
+                        withAnimation {
+                            isExpanded.toggle()
+                        }
+                    }) {
+                        Label(isExpanded ? "Collapse" : "Expand", 
+                              systemImage: isExpanded ? "arrow.up.circle" : "arrow.down.circle")
+                    }
+                    
+                    Button(action: {
+                        UIPasteboard.general.string = taskIdentifier
+                    }) {
+                        Label("Copy Identifier", systemImage: "doc.on.doc")
+                    }
+                }
+                .help(taskIdentifier) // macOS tooltip
+        } else {
+            // For shorter identifiers, show fully with limited lines
+            Text(taskIdentifier)
+                .font(font)
+                .fontWeight(.medium)
+                .lineLimit(maxLines)
+                .multilineTextAlignment(.leading)
+                .contextMenu {
+                    Button(action: {
+                        UIPasteboard.general.string = taskIdentifier
+                    }) {
+                        Label("Copy Identifier", systemImage: "doc.on.doc")
+                    }
+                }
+                .help(taskIdentifier)
+        }
+    }
+    
+    private var truncatedIdentifier: String {
+        if taskIdentifier.count <= 35 {
+            return taskIdentifier
+        }
+        
+        // More generous truncation - try to keep meaningful parts visible
+        let components = taskIdentifier.components(separatedBy: ".")
+        if components.count > 1 {
+            let firstPart = components.first ?? ""
+            let lastPart = components.last ?? ""
+            let maxFirstLength = 18  // Increased from 12
+            let maxLastLength = 15   // Increased from 10
+            
+            let truncatedFirst = firstPart.count > maxFirstLength ? 
+                String(firstPart.prefix(maxFirstLength)) + "..." : firstPart
+            let truncatedLast = lastPart.count > maxLastLength ?
+                "..." + String(lastPart.suffix(maxLastLength)) : lastPart
+            
+            return "\(truncatedFirst).\(truncatedLast)"
+        } else {
+            // Fallback to simple truncation - more generous
+            return String(taskIdentifier.prefix(32)) + "..."
+        }
+    }
+}
+
+/// A compact view for displaying task identifiers in lists
+struct CompactTaskIdentifierRow: View {
+    let taskIdentifier: String
+    let subtitle: String?
+    let trailingContent: (() -> AnyView)?
+    
+    init(_ taskIdentifier: String, subtitle: String? = nil, @ViewBuilder trailingContent: @escaping () -> some View = { EmptyView() }) {
+        self.taskIdentifier = taskIdentifier
+        self.subtitle = subtitle
+        self.trailingContent = { AnyView(trailingContent()) }
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                TaskIdentifierText(taskIdentifier, font: .subheadline, maxLines: 3, alwaysExpanded: true)
+                
+                if let subtitle = subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            
+            Spacer(minLength: 8)
+            
+            trailingContent?()
+        }
+        .padding(.vertical, 4)
+    }
+}
+
 struct StatisticCard: View {
     let title: String
     let value: String
@@ -1839,9 +1987,7 @@ struct RecentEventsView: View {
                                 .foregroundColor(event.success ? .green : .red)
                             
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(event.taskIdentifier)
-                                    .font(.caption)
-                                    .fontWeight(.medium)
+                                TaskIdentifierText(event.taskIdentifier, font: .caption, maxLines: 3, alwaysExpanded: true)
                                 
                                 Text(event.type.rawValue)
                                     .font(.caption2)
@@ -1892,9 +2038,7 @@ struct TimelineRowView: View {
             // Event details
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(dataPoint.taskIdentifier)
-                        .font(.caption)
-                        .fontWeight(.medium)
+                    TaskIdentifierText(dataPoint.taskIdentifier, font: .caption, maxLines: 3, alwaysExpanded: true)
                     
                     Spacer()
                     
@@ -1928,8 +2072,7 @@ struct TaskMetricCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(metric.taskIdentifier)
-                .font(.headline)
+            TaskIdentifierText(metric.taskIdentifier, font: .headline, maxLines: 3, alwaysExpanded: true)
             
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
                 MetricRow(label: "Scheduled", value: "\(metric.totalScheduled)")
@@ -1977,8 +2120,7 @@ struct ErrorEventCard: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.red)
                 
-                Text(event.taskIdentifier)
-                    .font(.headline)
+                TaskIdentifierText(event.taskIdentifier, font: .headline, maxLines: 3, alwaysExpanded: true)
                 
                 Spacer()
                 
@@ -2215,9 +2357,7 @@ struct EnhancedTaskMetricCard: View {
         Button(action: onTapDetail) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Text(metric.taskIdentifier)
-                        .font(.headline)
-                        .fontWeight(.medium)
+                    TaskIdentifierText(metric.taskIdentifier, font: .headline, maxLines: 3, showFullInTooltip: true, alwaysExpanded: true)
                         .foregroundColor(.primary)
                     
                     Spacer()
@@ -2392,20 +2532,28 @@ struct DetailedTaskPerformanceView: View {
     @ObservedObject var viewModel: DashboardViewModel
     @Environment(\.dismiss) private var dismiss
     
+    private var truncatedTitle: String {
+        return taskIdentifier.count > 20 ? String(taskIdentifier.prefix(17)) + "..." : taskIdentifier
+    }
+    
     var body: some View {
         NavigationView {
             ScrollView {
                 LazyVStack(spacing: 20) {
                     // Detailed performance charts and metrics
-                    Text("Detailed performance view for \(taskIdentifier)")
-                        .font(.title2)
-                        .padding()
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Detailed Performance Analysis")
+                            .font(.title2)
+                        
+                        TaskIdentifierText(taskIdentifier, font: .headline, maxLines: nil, showFullInTooltip: true, alwaysExpanded: true)
+                            .padding(.horizontal)
+                    }
                     
                     // Add detailed charts, metrics, and analysis here
                 }
                 .padding()
             }
-            .navigationTitle(taskIdentifier)
+            .navigationTitle(truncatedTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

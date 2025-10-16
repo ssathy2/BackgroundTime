@@ -19,8 +19,16 @@ public struct TaskSchedulingAnalysisView: View {
         self.analysis = analysis
     }
     
+    private var truncatedNavigationTitle: String {
+        let identifier = analysis.taskIdentifier
+        return identifier.count > 25 ? String(identifier.prefix(22)) + "..." : identifier
+    }
+    
     public var body: some View {
         VStack(spacing: 0) {
+            // Full Task Identifier Header
+            TaskIdentifierHeaderView(taskIdentifier: analysis.taskIdentifier)
+            
             // Tab Bar - Fixed spacing and padding
             Picker("Analysis Tab", selection: $selectedTab) {
                 Text("Overview").tag(0)
@@ -44,7 +52,7 @@ public struct TaskSchedulingAnalysisView: View {
             }
             .animation(.easeInOut(duration: 0.2), value: selectedTab)
         }
-        .navigationTitle(analysis.taskIdentifier)
+        .navigationTitle(truncatedNavigationTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color(.systemBackground), for: .navigationBar)
     }
@@ -629,6 +637,7 @@ public struct TaskSchedulingOverviewView: View {
 @available(iOS 16.0, *)
 private struct TaskSummaryRow: View {
     let analysis: TaskSchedulingAnalysis
+    @State private var showingCopyAlert = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -636,7 +645,15 @@ private struct TaskSummaryRow: View {
                 Text(analysis.taskIdentifier)
                     .font(.headline)
                     .fixedSize(horizontal: false, vertical: true)
-                    .lineLimit(2)
+                    .lineLimit(3)  // Increased from 2 to show more of the identifier
+                    .contextMenu {
+                        Button(action: {
+                            UIPasteboard.general.string = analysis.taskIdentifier
+                            showingCopyAlert = true
+                        }) {
+                            Label("Copy Identifier", systemImage: "doc.on.doc")
+                        }
+                    }
                 
                 Spacer()
                 
@@ -669,5 +686,67 @@ private struct TaskSummaryRow: View {
             }
         }
         .padding(.vertical, 8)
+        .alert("Copied", isPresented: $showingCopyAlert) {
+            Button("OK") { }
+        } message: {
+            Text("Task identifier copied to clipboard")
+        }
+    }
+}
+
+// MARK: - Task Identifier Header View
+
+@available(iOS 16.0, *)
+private struct TaskIdentifierHeaderView: View {
+    let taskIdentifier: String
+    @State private var showingCopyAlert = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Task Identifier")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .textCase(.uppercase)
+                    
+                    Text(taskIdentifier)
+                        .font(.body)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .contextMenu {
+                            Button(action: {
+                                UIPasteboard.general.string = taskIdentifier
+                                showingCopyAlert = true
+                            }) {
+                                Label("Copy Identifier", systemImage: "doc.on.doc")
+                            }
+                        }
+                }
+                
+                Spacer()
+                
+                Button(action: {
+                    UIPasteboard.general.string = taskIdentifier
+                    showingCopyAlert = true
+                }) {
+                    Image(systemName: "doc.on.doc")
+                        .font(.body)
+                        .foregroundColor(.blue)
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.circle)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color(.tertiarySystemGroupedBackground))
+        .alert("Copied", isPresented: $showingCopyAlert) {
+            Button("OK") { }
+        } message: {
+            Text("Task identifier copied to clipboard")
+        }
     }
 }
