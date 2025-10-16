@@ -6,26 +6,34 @@ on:
   pull_request:
     branches: [ main ]
 
+# Cancel in-progress runs when a new workflow with the same group name is triggered
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-ios:
     name: Test iOS
-    runs-on: macos-latest
+    runs-on: macos-15  # Updated to macOS 15
     strategy:
       matrix:
         destination: 
-          - "platform=iOS Simulator,name=iPhone 15,OS=17.0"
-          - "platform=iOS Simulator,name=iPhone 14,OS=16.0"
+          - "platform=iOS Simulator,name=iPhone 17,OS=26.0"
+          - "platform=iOS Simulator,name=iPhone 16 Pro,OS=18.1"
+          - "platform=iOS Simulator,name=iPhone 15,OS=17.5"
     
     steps:
     - uses: actions/checkout@v4
     
     - name: Select Xcode Version
-      run: sudo xcode-select -s /Applications/Xcode_15.0.app/Contents/Developer
+      run: sudo xcode-select -s /Applications/Xcode_26.app/Contents/Developer
     
     - name: Cache Swift Package Manager
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
-        path: .build
+        path: |
+          .build
+          ~/Library/Developer/Xcode/DerivedData
         key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
         restore-keys: |
           ${{ runner.os }}-spm-
@@ -37,22 +45,24 @@ jobs:
       run: swift build -v
     
     - name: Run Tests
-      run: swift test -v
+      run: swift test -v --parallel
 
   test-macos:
     name: Test macOS
-    runs-on: macos-latest
+    runs-on: macos-26
     
     steps:
     - uses: actions/checkout@v4
     
     - name: Select Xcode Version
-      run: sudo xcode-select -s /Applications/Xcode_15.0.app/Contents/Developer
+      run: sudo xcode-select -s /Applications/Xcode_26.app/Contents/Developer
     
     - name: Cache Swift Package Manager
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
-        path: .build
+        path: |
+          .build
+          ~/Library/Developer/Xcode/DerivedData
         key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
         restore-keys: |
           ${{ runner.os }}-spm-
@@ -64,17 +74,17 @@ jobs:
       run: swift build -v --arch arm64 --arch x86_64
     
     - name: Run Tests
-      run: swift test -v
+      run: swift test -v --parallel
 
   documentation:
     name: Build Documentation
-    runs-on: macos-latest
+    runs-on: macos-26
     
     steps:
     - uses: actions/checkout@v4
     
     - name: Select Xcode Version
-      run: sudo xcode-select -s /Applications/Xcode_15.0.app/Contents/Developer
+      run: sudo xcode-select -s /Applications/Xcode_26.app/Contents/Developer
     
     - name: Build Documentation
       run: |
@@ -84,15 +94,22 @@ jobs:
           --transform-for-static-hosting \
           --hosting-base-path BackgroundTime \
           --output-path docs
+    
+    - name: Upload Documentation
+      uses: actions/upload-artifact@v4
+      with:
+        name: documentation
+        path: docs
 
   lint:
     name: SwiftLint
-    runs-on: macos-latest
+    runs-on: macos-26
     
     steps:
     - uses: actions/checkout@v4
     
-    - name: SwiftLint
-      uses: norio-nomura/action-swiftlint@3.2.1
-      with:
-        args: --strict
+    - name: Install SwiftLint
+      run: brew install swiftlint
+    
+    - name: Run SwiftLint
+      run: swiftlint lint --strict
