@@ -423,7 +423,7 @@ struct DashboardTests {
             "System Error": 2
         ]
         
-        let _ = ErrorsTabView.ErrorSummarySection(errorsByType: errorsByType)
+        let _ = ErrorSummarySection(errorsByType: errorsByType)
         #expect(true, "ErrorSummarySection should be created successfully")
     }
     
@@ -533,7 +533,7 @@ struct DashboardTests {
         #expect(true, "Should handle empty events list")
         
         let emptyErrorsByType: [String: Int] = [:]
-        let _ = ErrorsTabView.ErrorSummarySection(errorsByType: emptyErrorsByType)
+        let _ = ErrorSummarySection(errorsByType: emptyErrorsByType)
         #expect(true, "Should handle empty errors")
     }
     
