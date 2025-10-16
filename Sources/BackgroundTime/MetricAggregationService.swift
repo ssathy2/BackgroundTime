@@ -26,7 +26,7 @@ public final class MetricAggregationService: Sendable {
     // MARK: - Report Generation
     
     public func generateReport(for timeRange: DateInterval) async -> MetricAggregationReport {
-        logger.info("Generating metric aggregation report for range: \(timeRange.start) - \(timeRange.end)")
+        logInfo("Generating metric aggregation report for range: \(timeRange.start) - \(timeRange.end)")
         
         let events = dataStore.getEventsInDateRange(from: timeRange.start, to: timeRange.end)
         
@@ -45,7 +45,7 @@ public final class MetricAggregationService: Sendable {
             errorMetrics: errorMetrics
         )
         
-        logger.info("Generated report with \(events.count) events")
+        logInfo("Generated report with \(events.count) events")
         return report
     }
     

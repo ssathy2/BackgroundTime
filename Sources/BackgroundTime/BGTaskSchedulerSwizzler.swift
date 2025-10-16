@@ -43,7 +43,7 @@ final class BGTaskSchedulerSwizzler {
         let originalMethod = class_getInstanceMethod(BGTaskScheduler.self, registerSelector)
         let swizzledMethod = class_getInstanceMethod(BGTaskScheduler.self, swizzledSelector)
         
-        logger.info("Swizzling test - Original: \(originalMethod != nil), Swizzled: \(swizzledMethod != nil), Complete: \(hasSwizzled)")
+        logInfo("Swizzling test - Original: \(originalMethod != nil), Swizzled: \(swizzledMethod != nil), Complete: \(hasSwizzled)")
     }
     
     private static func swizzleSubmitMethod() {

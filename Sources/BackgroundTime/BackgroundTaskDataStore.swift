@@ -19,8 +19,14 @@ final class BackgroundTaskDataStore: @unchecked Sendable {
     
     private let userDefaults: UserDefaults
     private let eventsKey = "BackgroundTime.StoredEvents"
+    private let isTestEnvironment: Bool
     
     private init() {
+        // Detect test environment
+        self.isTestEnvironment = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
+                                NSClassFromString("XCTestCase") != nil ||
+                                ProcessInfo.processInfo.arguments.contains("--test")
+        
         // Initialize with default capacity and default UserDefaults suite
         self.eventStore = ThreadSafeDataStore<BackgroundTaskEvent>(capacity: 1000)
         self.userDefaults = UserDefaults(suiteName: "BackgroundTime.DataStore") ?? UserDefaults.standard
@@ -29,9 +35,32 @@ final class BackgroundTaskDataStore: @unchecked Sendable {
     
     /// Create a data store instance with custom UserDefaults for testing
     init(userDefaults: UserDefaults) {
+        // Test environment detection for custom instances (likely used in tests)
+        self.isTestEnvironment = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
+                                NSClassFromString("XCTestCase") != nil ||
+                                ProcessInfo.processInfo.arguments.contains("--test")
+        
         self.eventStore = ThreadSafeDataStore<BackgroundTaskEvent>(capacity: 1000)
         self.userDefaults = userDefaults
         loadPersistedEvents()
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Log messages only when not in test environment
+    private func logInfo(_ message: String) {
+        guard !isTestEnvironment else { return }
+        logger.info("\(message)")
+    }
+    
+    private func logWarning(_ message: String) {
+        guard !isTestEnvironment else { return }
+        logger.warning("\(message)")
+    }
+    
+    private func logError(_ message: String) {
+        guard !isTestEnvironment else { return }
+        logger.error("\(message)")
     }
     
     func configure(maxStoredEvents: Int) {
@@ -42,7 +71,7 @@ final class BackgroundTaskDataStore: @unchecked Sendable {
         let duration = CFAbsoluteTimeGetCurrent() - startTime
         performanceMonitor.recordAccess(operation: "configure", duration: duration)
         
-        logger.info("Configured data store with max events: \(maxStoredEvents)")
+        logInfo("Configured data store with max events: \(maxStoredEvents)")
     }
     
     func recordEvent(_ event: BackgroundTaskEvent) {
@@ -55,10 +84,10 @@ final class BackgroundTaskDataStore: @unchecked Sendable {
         performanceMonitor.recordAccess(operation: "recordEvent", duration: duration)
         
         if droppedEvent != nil {
-            logger.warning("Event dropped due to capacity limit: \(droppedEvent!.taskIdentifier)")
+            logWarning("Event dropped due to capacity limit: \(droppedEvent!.taskIdentifier)")
         }
         
-        logger.info("Recorded event: \(event.type.rawValue) for task: \(event.taskIdentifier)")
+        logInfo("Recorded event: \(event.type.rawValue) for task: \(event.taskIdentifier)")
     }
     
     func getAllEvents() -> [BackgroundTaskEvent] {
@@ -159,13 +188,13 @@ final class BackgroundTaskDataStore: @unchecked Sendable {
             
             // Debug logging for unusual success rates
             if rate > 1.0 {
-                logger.warning("⚠️ Success rate calculation anomaly detected:")
-                logger.warning("  - Total executed: \(totalExecuted)")
-                logger.warning("  - Successful completions: \(successfulCompletions)")
-                logger.warning("  - Raw success rate: \(rate) (\(rate * 100)%)")
-                logger.warning("  - Clamped to: \(successRate) (\(successRate * 100)%)")
-                logger.warning("  - Execution started events: \(executionStartedEvents.count)")
-                logger.warning("  - Completion events: \(completionEvents.count)")
+                logWarning("⚠️ Success rate calculation anomaly detected:")
+                logWarning("  - Total executed: \(totalExecuted)")
+                logWarning("  - Successful completions: \(successfulCompletions)")
+                logWarning("  - Raw success rate: \(rate) (\(rate * 100)%)")
+                logWarning("  - Clamped to: \(successRate) (\(successRate * 100)%)")
+                logWarning("  - Execution started events: \(executionStartedEvents.count)")
+                logWarning("  - Completion events: \(completionEvents.count)")
             }
         } else {
             successRate = 0.0
@@ -215,7 +244,7 @@ final class BackgroundTaskDataStore: @unchecked Sendable {
         let duration = CFAbsoluteTimeGetCurrent() - startTime
         performanceMonitor.recordAccess(operation: "clearAllEvents", duration: duration)
         
-        logger.info("Cleared all stored events")
+        logInfo("Cleared all stored events")
     }
     
     // MARK: - Private Methods
@@ -226,7 +255,7 @@ final class BackgroundTaskDataStore: @unchecked Sendable {
             let data = try JSONEncoder().encode(events)
             userDefaults.set(data, forKey: eventsKey)
         } catch {
-            logger.error("Failed to persist events: \(error.localizedDescription)")
+            logError("Failed to persist events: \(error.localizedDescription)")
         }
     }
     
@@ -236,9 +265,9 @@ final class BackgroundTaskDataStore: @unchecked Sendable {
         do {
             let events = try JSONDecoder().decode([BackgroundTaskEvent].self, from: data)
             eventStore.append(contentsOf: events)
-            logger.info("Loaded \(events.count) persisted events")
+            logInfo("Loaded \(events.count) persisted events")
         } catch {
-            logger.error("Failed to load persisted events: \(error.localizedDescription)")
+            logError("Failed to load persisted events: \(error.localizedDescription)")
         }
     }
     

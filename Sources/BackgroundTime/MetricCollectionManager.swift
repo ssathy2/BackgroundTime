@@ -76,7 +76,7 @@ import Darwin
         metricManager = MXMetricManager.shared
         metricManager.add(self)
         isMetricKitEnabled = true
-        logger.info("MetricKit integration enabled successfully")
+        logInfo("MetricKit integration enabled successfully")
     }
     
     // MARK: - Task Execution Tracking
@@ -113,7 +113,7 @@ import Darwin
             taskExecutionStartTimes.removeValue(forKey: identifier)
         } else {
             duration = 0
-            logger.warning("No start time found for task: \(identifier)")
+            logWarning("No start time found for task: \(identifier)")
         }
         
         // Stop monitoring
@@ -136,7 +136,7 @@ import Darwin
         dataStore.recordEvent(event)
         taskSchedulingTimes.removeValue(forKey: identifier)
         
-        logger.info("Recorded task execution completion for: \(identifier) - Success: \(success), Duration: \(String(format: "%.3f", duration))s")
+        logInfo("Recorded task execution completion for: \(identifier) - Success: \(success), Duration: \(String(format: "%.3f", duration))s")
     }
     
     func recordTaskExpiration(identifier: String) {
@@ -161,7 +161,7 @@ import Darwin
         _ = networkMonitor.stopMonitoring(for: identifier)
         taskSchedulingTimes.removeValue(forKey: identifier)
         
-        logger.info("Recorded task expiration for: \(identifier)")
+        logInfo("Recorded task expiration for: \(identifier)")
     }
     
     // MARK: - Private Helper Methods
@@ -185,7 +185,7 @@ import Darwin
         dataStore.recordEvent(event)
         
         if latency > 10.0 { // Log high latency
-            logger.warning("High scheduling latency detected: \(String(format: "%.3f", latency))s for task: \(identifier)")
+            logWarning("High scheduling latency detected: \(String(format: "%.3f", latency))s for task: \(identifier)")
         }
     }
     
@@ -253,7 +253,7 @@ import Darwin
         systemResourceMonitor.startContinuousMonitoring()
         networkMonitor.startContinuousMonitoring()
         
-        logger.info("Started continuous system monitoring")
+        logInfo("Started continuous system monitoring")
     }
     
     private func categorizeLatency(_ latency: TimeInterval) -> String {
@@ -335,7 +335,7 @@ import Darwin
         )
         
         dataStore.recordEvent(event)
-        logger.info("Processed MetricKit payload with metrics data")
+        logInfo("Processed MetricKit payload with metrics data")
     }
     
     private func processDiagnosticPayload(_ payload: MXDiagnosticPayload) {
@@ -355,7 +355,7 @@ import Darwin
         )
         
         dataStore.recordEvent(event)
-        logger.warning("Processed MetricKit diagnostic payload")
+        logWarning("Processed MetricKit diagnostic payload")
     }
     
     private func extractMetricKitData(from payload: MXMetricPayload) -> [String: Any] {
@@ -565,7 +565,7 @@ private class SystemResourceMonitor {
     func startContinuousMonitoring() {
         // Skip continuous monitoring during tests
         guard !isTestEnvironment else {
-            logger.info("Skipping continuous system monitoring in test environment")
+            logInfo("Skipping continuous system monitoring in test environment")
             return
         }
         
@@ -592,15 +592,15 @@ private class SystemResourceMonitor {
         let metrics = getCurrentSystemMetrics()
         
         if metrics.availableMemoryPercentage < 10 {
-            logger.warning("Low memory condition detected: \(Int(metrics.availableMemoryPercentage))% available")
+            logWarning("Low memory condition detected: \(Int(metrics.availableMemoryPercentage))% available")
         }
         
         if metrics.batteryLevel < 0.2 && !metrics.isCharging {
-            logger.warning("Low battery condition: \(Int(metrics.batteryLevel * 100))%")
+            logWarning("Low battery condition: \(Int(metrics.batteryLevel * 100))%")
         }
         
         if metrics.thermalState.thermalState == .critical || metrics.thermalState.thermalState == .serious {
-            logger.warning("High thermal state: \(Self.thermalStateToString(metrics.thermalState.thermalState))")
+            logWarning("High thermal state: \(Self.thermalStateToString(metrics.thermalState.thermalState))")
         }
     }
     
@@ -747,7 +747,7 @@ private class NetworkMetricsCollector {
     func startContinuousMonitoring() {
         // Network monitoring would typically involve more complex setup
         // For now, we'll track basic connectivity
-        logger.info("Started continuous network monitoring")
+        logInfo("Started continuous network monitoring")
     }
 }
 
