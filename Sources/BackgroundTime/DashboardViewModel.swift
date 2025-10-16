@@ -59,20 +59,8 @@ public class DashboardViewModel: ObservableObject {
             // Calculate time range with proper date handling using extension
             let timeInterval = selectedTimeRange.dateInterval
             
-            // Debug logging for time range filtering
-            print("🕒 Time Range Filtering:")
-            print("   - \(selectedTimeRange.debugDescription)")
-            
             // Load filtered events with precise date filtering
             let filteredEvents = dataStore.getEventsInDateRange(from: timeInterval.start, to: timeInterval.end)
-            
-            print("  - Found \(filteredEvents.count) events in range")
-            if filteredEvents.count > 0 {
-                let timestamps = filteredEvents.map { $0.timestamp }.sorted()
-                if let earliest = timestamps.first, let latest = timestamps.last {
-                    print("  - Event range: \(earliest) to \(latest)")
-                }
-            }
             
             // Generate statistics based on filtered events
             let stats = dataStore.generateStatistics(for: filteredEvents, in: timeInterval.start...timeInterval.end)
@@ -109,10 +97,6 @@ public class DashboardViewModel: ObservableObject {
                 }
                 
                 self.isLoading = false
-                
-                // Log final results
-                print("  - Statistics: \(stats.totalTasksExecuted) executed, \(stats.totalTasksCompleted) completed")
-                print("  - Success Rate: \(String(format: "%.1f", stats.successRate * 100))%")
             }
             
         } catch {
