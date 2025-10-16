@@ -1,0 +1,43 @@
+disabled_rules:
+  - line_length
+  - file_length
+  - type_body_length
+  - function_body_length
+  - cyclomatic_complexity
+
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  - overridden_super_call
+  - redundant_nil_coalescing
+  - strict_fileprivate
+  - toggle_bool
+  - unused_import
+  - unused_optional_binding
+
+included:
+  - Sources
+  - Tests
+
+excluded:
+  - .build
+  - Packages
+  - Examples
+
+analyzer_rules:
+  - unused_import
+
+force_unwrapping: error
+implicitly_unwrapped_optional: error
+
+identifier_name:
+  min_length: 1
+  excluded:
+    - id
+    - x
+    - y
+    - z
+
+reporter: "xcode"

@@ -1,6 +1,13 @@
 # BackgroundTime SDK
 
+[![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org)
+[![Platform](https://img.shields.io/badge/Platform-iOS%2015%2B%20%7C%20macOS%2012%2B-lightgrey)](https://developer.apple.com)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Beta](https://img.shields.io/badge/Status-Beta-yellow.svg)](https://github.com/yourusername/BackgroundTime/releases)
+
 A comprehensive iOS framework for monitoring and analyzing BackgroundTasks performance using method swizzling to provide deep insights into your app's background processing behavior.
+
+> **⚠️ Beta Release**: This is a beta version. APIs may change before the stable release. Feedback and contributions are welcome!
 
 ## Overview
 
@@ -37,14 +44,15 @@ BackgroundTime SDK automatically tracks all BackgroundTasks API usage in your iO
 #### Swift Package Manager
 ```swift
 dependencies: [
-    .package(url: "https://github.com/yourusername/BackgroundTime", from: "1.0.0")
+    .package(url: "https://github.com/yourusername/BackgroundTime", from: "0.1.0-beta")
 ]
 ```
 
 #### Xcode
 1. File → Add Package Dependencies
-2. Enter the package URL
-3. Add to your target
+2. Enter: `https://github.com/yourusername/BackgroundTime`
+3. Select "Up to Next Major Version" with `0.1.0-beta`
+4. Add to your target
 
 ### 2. Initialize the SDK
 
@@ -226,6 +234,15 @@ The SDK uses runtime method swizzling to intercept:
 - **JSON Export**: Standard format for integration with existing tools
 - **Configurable Endpoints**: Support for custom dashboard URLs
 - **Error Handling**: Robust network error handling and retry logic
+
+## Beta Feedback
+
+We'd love your feedback on this beta release! Please:
+
+- 🐛 [Report bugs](https://github.com/yourusername/BackgroundTime/issues/new?labels=bug)  
+- 💡 [Suggest features](https://github.com/yourusername/BackgroundTime/issues/new?labels=enhancement)
+- 📖 [Improve documentation](https://github.com/yourusername/BackgroundTime/issues/new?labels=documentation)
+- ⭐ Star the repo if you find it useful!
 
 ## Requirements
 
