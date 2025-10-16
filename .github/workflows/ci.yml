@@ -17,11 +17,10 @@ jobs:
     runs-on: macos-26
     strategy:
       matrix:
-        platform:
-          - destination: "platform=iOS Simulator,name=iPhone 17,OS=26.0"
-            name: iOS
-          - destination: "platform=macOS"
-            name: macOS
+        destination: 
+          - "platform=iOS Simulator,name=iPhone 17,OS=26.0"
+          - "platform=iOS Simulator,name=iPhone 16 Pro,OS=18.1"
+          - "platform=iOS Simulator,name=iPhone 15,OS=17.5"
     
     steps:
     - uses: actions/checkout@v4
@@ -43,10 +42,10 @@ jobs:
           -project BackgroundTime.xcodeproj \
           -scheme BackgroundTime \
           -testPlan BackgroundTimeSDK \
-          -destination "${{ matrix.platform.destination }}" \
+          -destination "${{ matrix.destination }}" \
           -derivedDataPath DerivedData \
           -enableCodeCoverage YES \
-          -resultBundlePath TestResults-SDK-${{ matrix.platform.name }}.xcresult \
+          -resultBundlePath TestResults-SDK-${{ strategy.job-index }}.xcresult \
           CODE_SIGNING_ALLOWED=NO \
           | xcpretty && exit ${PIPESTATUS[0]}
     
@@ -54,19 +53,21 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test-results-sdk-${{ matrix.platform.name }}
-        path: TestResults-SDK-${{ matrix.platform.name }}.xcresult
+        name: test-results-sdk-${{ strategy.job-index }}
+        path: TestResults-SDK-${{ strategy.job-index }}.xcresult
     
     - name: Generate Code Coverage Report
+      if: matrix.destination == 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.1'
       run: |
-        xcrun xccov view --report --json TestResults-SDK-${{ matrix.platform.name }}.xcresult > coverage-sdk-${{ matrix.platform.name }}.json
-        xcrun xccov view --report TestResults-SDK-${{ matrix.platform.name }}.xcresult
+        xcrun xccov view --report --json TestResults-SDK-${{ strategy.job-index }}.xcresult > coverage-sdk.json
+        xcrun xccov view --report TestResults-SDK-${{ strategy.job-index }}.xcresult
     
     - name: Upload Coverage
+      if: matrix.destination == 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.1'
       uses: actions/upload-artifact@v4
       with:
-        name: coverage-sdk-${{ matrix.platform.name }}
-        path: coverage-sdk-${{ matrix.platform.name }}.json
+        name: coverage-sdk
+        path: coverage-sdk.json
 
   test-example:
     name: Test Example App
@@ -74,7 +75,7 @@ jobs:
     strategy:
       matrix:
         destination: 
-          - "platform=iOS Simulator,name=iPhone 7,OS=26.0"
+          - "platform=iOS Simulator,name=iPhone 17,OS=26.0"
           - "platform=iOS Simulator,name=iPhone 16 Pro,OS=18.1"
           - "platform=iOS Simulator,name=iPhone 15,OS=17.5"
     
@@ -113,13 +114,13 @@ jobs:
         path: TestResults-Example-${{ strategy.job-index }}.xcresult
     
     - name: Generate Code Coverage Report
-      if: matrix.destination == 'platform=iOS Simulator,name=iPhone 17,OS=26.0'
+      if: matrix.destination == 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.1'
       run: |
         xcrun xccov view --report --json TestResults-Example-${{ strategy.job-index }}.xcresult > coverage-example.json
         xcrun xccov view --report TestResults-Example-${{ strategy.job-index }}.xcresult
     
     - name: Upload Coverage
-      if: matrix.destination == 'platform=iOS Simulator,name=iPhone 17,OS=26.0'
+      if: matrix.destination == 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.1'
       uses: actions/upload-artifact@v4
       with:
         name: coverage-example
