@@ -25,24 +25,57 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Cache Swift Package Manager
+    - name: Cache DerivedData
       uses: actions/cache@v4
       with:
-        path: |
-          .build
-          ~/Library/Developer/Xcode/DerivedData
-        key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+        path: ~/Library/Developer/Xcode/DerivedData
+        key: ${{ runner.os }}-derived-data-${{ hashFiles('**/Package.resolved') }}
         restore-keys: |
-          ${{ runner.os }}-spm-
+          ${{ runner.os }}-derived-data-
     
-    - name: Swift Package Resolve
-      run: swift package resolve
+    - name: List Available Schemes
+      run: xcodebuild -list
     
-    - name: Build
-      run: swift build -v
+    - name: Build for Testing
+      run: |
+        xcodebuild build-for-testing \
+          -scheme BackgroundTime \
+          -destination "${{ matrix.destination }}" \
+          -derivedDataPath DerivedData \
+          -enableCodeCoverage YES \
+          CODE_SIGNING_ALLOWED=NO \
+          | xcpretty && exit ${PIPESTATUS[0]}
     
     - name: Run Tests
-      run: swift test -v --parallel
+      run: |
+        xcodebuild test-without-building \
+          -scheme BackgroundTime \
+          -destination "${{ matrix.destination }}" \
+          -derivedDataPath DerivedData \
+          -enableCodeCoverage YES \
+          -resultBundlePath TestResults.xcresult \
+          CODE_SIGNING_ALLOWED=NO \
+          | xcpretty && exit ${PIPESTATUS[0]}
+    
+    - name: Upload Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-ios-${{ strategy.job-index }}
+        path: TestResults.xcresult
+    
+    - name: Generate Code Coverage Report
+      if: matrix.destination == 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.1'
+      run: |
+        xcrun xccov view --report --json DerivedData/Logs/Test/*.xcresult > coverage.json
+        xcrun xccov view --report DerivedData/Logs/Test/*.xcresult
+    
+    - name: Upload Coverage
+      if: matrix.destination == 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.1'
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-ios
+        path: coverage.json
 
   test-macos:
     name: Test macOS
@@ -51,24 +84,52 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Cache Swift Package Manager
+    - name: Cache DerivedData
       uses: actions/cache@v4
       with:
-        path: |
-          .build
-          ~/Library/Developer/Xcode/DerivedData
-        key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+        path: ~/Library/Developer/Xcode/DerivedData
+        key: ${{ runner.os }}-derived-data-${{ hashFiles('**/Package.resolved') }}
         restore-keys: |
-          ${{ runner.os }}-spm-
+          ${{ runner.os }}-derived-data-
     
-    - name: Swift Package Resolve
-      run: swift package resolve
-    
-    - name: Build for macOS
-      run: swift build -v --arch arm64 --arch x86_64
+    - name: Build for Testing
+      run: |
+        xcodebuild build-for-testing \
+          -scheme BackgroundTime \
+          -destination "platform=macOS" \
+          -derivedDataPath DerivedData \
+          -enableCodeCoverage YES \
+          CODE_SIGNING_ALLOWED=NO \
+          | xcpretty && exit ${PIPESTATUS[0]}
     
     - name: Run Tests
-      run: swift test -v --parallel
+      run: |
+        xcodebuild test-without-building \
+          -scheme BackgroundTime \
+          -destination "platform=macOS" \
+          -derivedDataPath DerivedData \
+          -enableCodeCoverage YES \
+          -resultBundlePath TestResults.xcresult \
+          CODE_SIGNING_ALLOWED=NO \
+          | xcpretty && exit ${PIPESTATUS[0]}
+    
+    - name: Upload Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-macos
+        path: TestResults.xcresult
+    
+    - name: Generate Code Coverage Report
+      run: |
+        xcrun xccov view --report --json DerivedData/Logs/Test/*.xcresult > coverage.json
+        xcrun xccov view --report DerivedData/Logs/Test/*.xcresult
+    
+    - name: Upload Coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-macos
+        path: coverage.json
 
   documentation:
     name: Build Documentation
@@ -78,6 +139,13 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Build Documentation
+      run: |
+        xcodebuild docbuild \
+          -scheme BackgroundTime \
+          -destination "platform=macOS" \
+          -derivedDataPath DerivedData
+    
+    - name: Process Documentation for Static Hosting
       run: |
         swift package --allow-writing-to-directory docs \
           generate-documentation --target BackgroundTime \
