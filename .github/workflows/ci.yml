@@ -18,7 +18,7 @@ jobs:
     strategy:
       matrix:
         destination: 
-          - "platform:iOS Simulator, name:Any iOS Simulator Device"
+          - "platform=iOS Simulator, name=Any iOS Simulator Device"
     
     steps:
     - uses: actions/checkout@v4
@@ -55,13 +55,13 @@ jobs:
         path: TestResults-SDK-${{ strategy.job-index }}.xcresult
     
     - name: Generate Code Coverage Report
-      if: matrix.destination == 'platform:iOS Simulator, name:Any iOS Simulator Device'
+      if: matrix.destination == 'platform=iOS Simulator, name=Any iOS Simulator Device'
       run: |
         xcrun xccov view --report --json TestResults-SDK-${{ strategy.job-index }}.xcresult > coverage-sdk.json
         xcrun xccov view --report TestResults-SDK-${{ strategy.job-index }}.xcresult
     
     - name: Upload Coverage
-      if: matrix.destination == 'platform:iOS Simulator, name:Any iOS Simulator Device'
+      if: matrix.destination == 'platform=iOS Simulator, name=Any iOS Simulator Device'
       uses: actions/upload-artifact@v4
       with:
         name: coverage-sdk
@@ -73,7 +73,7 @@ jobs:
     strategy:
       matrix:
         destination: 
-          - "platform:iOS Simulator, name:Any iOS Simulator Device"
+          - "platform=iOS Simulator, name=Any iOS Simulator Device"
     
     steps:
     - uses: actions/checkout@v4
@@ -110,13 +110,13 @@ jobs:
         path: TestResults-Example-${{ strategy.job-index }}.xcresult
     
     - name: Generate Code Coverage Report
-      if: matrix.destination == 'platform:iOS Simulator, name:Any iOS Simulator Device'
+      if: matrix.destination == 'platform=iOS Simulator, name=Any iOS Simulator Device'
       run: |
         xcrun xccov view --report --json TestResults-Example-${{ strategy.job-index }}.xcresult > coverage-example.json
         xcrun xccov view --report TestResults-Example-${{ strategy.job-index }}.xcresult
     
     - name: Upload Coverage
-      if: matrix.destination == 'platform:iOS Simulator, name:Any iOS Simulator Device'
+      if: matrix.destination == 'platform=iOS Simulator, name=Any iOS Simulator Device'
       uses: actions/upload-artifact@v4
       with:
         name: coverage-example
