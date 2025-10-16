@@ -44,8 +44,7 @@ jobs:
           -derivedDataPath DerivedData \
           -enableCodeCoverage YES \
           -resultBundlePath TestResults-SDK-${{ strategy.job-index }}.xcresult \
-          CODE_SIGNING_ALLOWED=NO \
-          | xcpretty && exit ${PIPESTATUS[0]}
+          CODE_SIGNING_ALLOWED=NO
     
     - name: Upload Test Results
       if: always()
