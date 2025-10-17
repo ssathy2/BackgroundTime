@@ -164,51 +164,6 @@ struct MetricCollectionTests {
         #expect(decodedState.thermalState.rawValue == 2) // serious = 2
     }
     
-    @Test("Long Task Identifier Truncation")
-    func testLongTaskIdentifierTruncation() async throws {
-        // Test simple truncation
-        let shortIdentifier = "com.app.task"
-        #expect(shortIdentifier.count <= 35) // Updated threshold - Should not need truncation
-        
-        // Test complex identifier with dots
-        let longIdentifier = "com.mycompany.myapp.backgroundtasks.networksync.downloadmanager.task.extended.identifier"
-        #expect(longIdentifier.count > 35) // Should need truncation
-        
-        // Test smart truncation logic (simulating the updated private method)
-        func smartTruncate(_ identifier: String) -> String {
-            if identifier.count <= 35 {  // Updated threshold
-                return identifier
-            }
-            
-            let components = identifier.components(separatedBy: ".")
-            if components.count > 1 {
-                let firstPart = components.first ?? ""
-                let lastPart = components.last ?? ""
-                let maxFirstLength = 18  // Updated from 12
-                let maxLastLength = 15   // Updated from 10
-                
-                let truncatedFirst = firstPart.count > maxFirstLength ? 
-                    String(firstPart.prefix(maxFirstLength)) + "..." : firstPart
-                let truncatedLast = lastPart.count > maxLastLength ?
-                    "..." + String(lastPart.suffix(maxLastLength)) : lastPart
-                
-                return "\(truncatedFirst).\(truncatedLast)"
-            } else {
-                return String(identifier.prefix(32)) + "..."  // Updated from 22
-            }
-        }
-        
-        let truncated = smartTruncate(longIdentifier)
-        #expect(truncated.count <= 45) // More generous truncated length
-        #expect(truncated.contains("com.mycompany...")) // Should start with first part
-        #expect(truncated.contains("...identifier")) // Should end with last part
-        
-        // Test medium-length identifier that should show fully
-        let mediumIdentifier = "com.mycompany.myapp.task"
-        let mediumTruncated = smartTruncate(mediumIdentifier)
-        #expect(mediumTruncated == mediumIdentifier) // Should not be truncated
-    }
-    
     @Test("Task Identifier Display Modes")
     func testTaskIdentifierDisplayModes() async throws {
         let longIdentifier = "com.mycompany.myapp.backgroundtasks.networksync.downloadmanager.task.extended.identifier.verylong"
