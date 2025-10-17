@@ -4,6 +4,7 @@
 [![Platform](https://img.shields.io/badge/Platform-iOS%2015%2B%20%7C%20macOS%2012%2B-lightgrey)](https://developer.apple.com)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Beta](https://img.shields.io/badge/Status-Beta-yellow.svg)](https://github.com/yourusername/BackgroundTime/releases)
+[![CI](https://github.com/ssathy2/BackgroundTime/actions/workflows/ci.yml/badge.svg)](https://github.com/ssathy2/BackgroundTime/actions/workflows/ci.yml)
 
 A comprehensive iOS framework for monitoring and analyzing BackgroundTasks performance using method swizzling to provide deep insights into your app's background processing behavior.
 
