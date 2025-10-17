@@ -14,7 +14,7 @@ concurrency:
 jobs:
   test-sdk:
     name: Test SDK
-    runs-on: macos-26,self-hosted
+    runs-on: [macos-26,self-hosted]
     strategy:
       matrix:
         destination: 
