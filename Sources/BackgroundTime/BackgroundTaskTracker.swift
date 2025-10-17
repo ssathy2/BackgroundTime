@@ -26,53 +26,53 @@ public class BackgroundTaskTracker {
     /// Call this at the beginning of your background task execution
     public func startExecution(for taskIdentifier: String) {
         guard !activeTaskExecutions.contains(taskIdentifier) else {
-            logWarning("Task execution already started for: \(taskIdentifier)")
+            logger.warning("Task execution already started for: \(taskIdentifier)")
             return
         }
         
         activeTaskExecutions.insert(taskIdentifier)
         metricCollector.recordTaskExecutionStart(identifier: taskIdentifier)
         
-        logInfo("Started execution tracking for task: \(taskIdentifier)")
+        logger.info("Started execution tracking for task: \(taskIdentifier)")
     }
     
     /// Call this when your background task completes successfully
     public func completeExecution(for taskIdentifier: String) {
         guard activeTaskExecutions.contains(taskIdentifier) else {
-            logWarning("No active execution found for task: \(taskIdentifier)")
+            logger.warning("No active execution found for task: \(taskIdentifier)")
             return
         }
         
         activeTaskExecutions.remove(taskIdentifier)
         metricCollector.recordTaskExecutionEnd(identifier: taskIdentifier, success: true)
         
-        logInfo("Completed execution tracking for task: \(taskIdentifier)")
+        logger.info("Completed execution tracking for task: \(taskIdentifier)")
     }
     
     /// Call this when your background task fails
     public func failExecution(for taskIdentifier: String, error: Error? = nil) {
         guard activeTaskExecutions.contains(taskIdentifier) else {
-            logWarning("No active execution found for task: \(taskIdentifier)")
+            logger.warning("No active execution found for task: \(taskIdentifier)")
             return
         }
         
         activeTaskExecutions.remove(taskIdentifier)
         metricCollector.recordTaskExecutionEnd(identifier: taskIdentifier, success: false, error: error)
         
-        logInfo("Failed execution tracking for task: \(taskIdentifier) - Error: \(error?.localizedDescription ?? "Unknown")")
+        logger.info("Failed execution tracking for task: \(taskIdentifier) - Error: \(error?.localizedDescription ?? "Unknown")")
     }
     
     /// Call this when your background task expires
     public func expireExecution(for taskIdentifier: String) {
         guard activeTaskExecutions.contains(taskIdentifier) else {
-            logWarning("No active execution found for task: \(taskIdentifier)")
+            logger.warning("No active execution found for task: \(taskIdentifier)")
             return
         }
         
         activeTaskExecutions.remove(taskIdentifier)
         metricCollector.recordTaskExpiration(identifier: taskIdentifier)
         
-        logInfo("Expired execution tracking for task: \(taskIdentifier)")
+        logger.info("Expired execution tracking for task: \(taskIdentifier)")
     }
     
     // MARK: - Convenience Methods
@@ -154,7 +154,7 @@ public class BackgroundTaskTracker {
             )
         }
         
-        logWarning("Cleaned up \(staleExecutions.count) stale task executions")
+        logger.warning("Cleaned up \(staleExecutions.count) stale task executions")
     }
     
     // MARK: - Network Request Tracking
@@ -181,7 +181,7 @@ public class BackgroundTaskTracker {
         value: Any
     ) {
         guard activeTaskExecutions.contains(taskIdentifier) else {
-            logWarning("Cannot add metadata for inactive task: \(taskIdentifier)")
+            logger.warning("Cannot add metadata for inactive task: \(taskIdentifier)")
             return
         }
         

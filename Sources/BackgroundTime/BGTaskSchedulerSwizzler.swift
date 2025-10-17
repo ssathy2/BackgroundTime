@@ -13,7 +13,7 @@ import UIKit
 // MARK: - BGTaskScheduler Method Swizzling
 @MainActor
 final class BGTaskSchedulerSwizzler {
-    private static let logger = Logger(subsystem: "BackgroundTime", category: "Swizzler")
+    private static let logger = ConditionalLogger(subsystem: "BackgroundTime", category: "Swizzler")
     
     // Add a flag to track if swizzling has been performed
     private static var hasSwizzled = false
@@ -43,7 +43,7 @@ final class BGTaskSchedulerSwizzler {
         let originalMethod = class_getInstanceMethod(BGTaskScheduler.self, registerSelector)
         let swizzledMethod = class_getInstanceMethod(BGTaskScheduler.self, swizzledSelector)
         
-        logInfo("Swizzling test - Original: \(originalMethod != nil), Swizzled: \(swizzledMethod != nil), Complete: \(hasSwizzled)")
+        logger.info("Swizzling test - Original: \(originalMethod != nil), Swizzled: \(swizzledMethod != nil), Complete: \(hasSwizzled)")
     }
     
     private static func swizzleSubmitMethod() {

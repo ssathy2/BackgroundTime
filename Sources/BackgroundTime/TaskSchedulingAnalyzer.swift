@@ -192,7 +192,7 @@ public final class TaskSchedulingAnalyzer {
         let events = dataStore.getAllEvents().filter { $0.taskIdentifier == taskIdentifier }
         
         guard !events.isEmpty else {
-            logWarning("No events found for task identifier: \(taskIdentifier)")
+            logger.warning("No events found for task identifier: \(taskIdentifier)")
             return nil
         }
         
@@ -201,7 +201,7 @@ public final class TaskSchedulingAnalyzer {
         let executedEvents = events.filter { $0.type == .taskExecutionStarted }
         
         guard !scheduledEvents.isEmpty else {
-            logWarning("No scheduled events found for task identifier: \(taskIdentifier)")
+            logger.warning("No scheduled events found for task identifier: \(taskIdentifier)")
             return nil
         }
         
@@ -209,7 +209,7 @@ public final class TaskSchedulingAnalyzer {
         let executionDelays = calculateExecutionDelays(scheduled: scheduledEvents, executed: executedEvents)
         
         guard !executionDelays.isEmpty else {
-            logInfo("No matching execution events found for scheduled tasks")
+            logger.info("No matching execution events found for scheduled tasks")
             return TaskSchedulingAnalysis(
                 taskIdentifier: taskIdentifier,
                 totalScheduledTasks: scheduledEvents.count,
