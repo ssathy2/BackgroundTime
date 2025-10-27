@@ -62,6 +62,7 @@
 /* Begin PBXFileReference section */
 		DE3028332E85931C007DD928 /* BackgroundTimeSDK.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = BackgroundTimeSDK.xctestplan; sourceTree = "<group>"; };
 		DE3028352E859320007DD928 /* BackgroundTimeExample.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = BackgroundTimeExample.xctestplan; sourceTree = "<group>"; };
+		DE3269DF2EA480CD000D1007 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		DE48B69E2E7E6128009A676E /* BackgroundTime.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BackgroundTime.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		DE48B6A92E7E6128009A676E /* BackgroundTimeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BackgroundTimeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DE48B6BC2E7E6148009A676E /* BackgroundTimeExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BackgroundTimeExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -157,6 +158,7 @@
 		DE48B6942E7E6128009A676E = {
 			isa = PBXGroup;
 			children = (
+				DE3269DF2EA480CD000D1007 /* README.md */,
 				DE3028332E85931C007DD928 /* BackgroundTimeSDK.xctestplan */,
 				DE3028352E859320007DD928 /* BackgroundTimeExample.xctestplan */,
 				DEB495502E8B5F9E005D7E66 /* Package.swift */,

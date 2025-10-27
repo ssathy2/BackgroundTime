@@ -14,6 +14,10 @@ A comprehensive iOS framework for monitoring and analyzing BackgroundTasks perfo
 
 BackgroundTime SDK automatically tracks all BackgroundTasks API usage in your iOS app without requiring code changes. It uses method swizzling to intercept BGTaskScheduler calls and provides detailed analytics through a beautiful SwiftUI dashboard.
 
+![Dashboard Overview](images/overview.jpg)
+
+*The BackgroundTime dashboard provides comprehensive insights into your app's background task performance with real-time analytics and beautiful visualizations.*
+
 ## Features
 
 ### 🔍 **Automatic Tracking**
@@ -22,10 +26,37 @@ BackgroundTime SDK automatically tracks all BackgroundTasks API usage in your iO
 - **Comprehensive coverage** - Tracks scheduling, execution, completion, cancellation, and failures
 
 ### 📊 **Rich Analytics Dashboard**
-- **Overview Tab** - Key statistics, success rates, execution patterns
-- **Timeline Tab** - Chronological view of all background task events
-- **Performance Tab** - Execution duration trends and task-specific metrics
-- **Errors Tab** - Detailed error analysis and failure patterns
+
+<table>
+<tr>
+<td width="50%">
+
+![Overview Tab](images/overview.jpg)
+**Overview Tab** - Key statistics, success rates, and execution patterns with beautiful charts
+
+</td>
+<td width="50%">
+
+![Timeline Tab](images/timeline.jpg)
+**Timeline Tab** - Chronological view of all background task events with detailed filtering
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+![Performance Tab](images/performance.jpg)
+**Performance Tab** - Advanced metrics including 3D visualizations and duration trends
+
+</td>
+<td width="50%">
+
+![Errors Tab](images/errors.jpg)
+**Errors Tab** - Detailed error analysis and failure pattern insights
+
+</td>
+</tr>
+</table>
 
 ### 📈 **Detailed Metrics**
 - **Execution Statistics** - Total scheduled/executed/completed/failed tasks
@@ -39,6 +70,8 @@ BackgroundTime SDK automatically tracks all BackgroundTasks API usage in your iO
 - **Real-time Monitoring** - Live updates for production app monitoring
 
 ## Quick Start
+
+*Get started in under 30 seconds - just add the package and initialize!*
 
 ### 1. Add the Package
 
@@ -79,6 +112,8 @@ struct MyApp: App {
 
 ### 3. Add the Dashboard (Optional)
 
+*Simple one-line integration to add the powerful analytics dashboard to your app*
+
 ```swift
 import BackgroundTime
 
@@ -101,6 +136,91 @@ struct ContentView: View {
                 BackgroundTimeDashboard()
             }
         }
+    }
+}
+```
+
+### 4. UIKit Integration (Alternative)
+
+For UIKit-based apps, you can present the dashboard using UIHostingController:
+
+```swift
+import UIKit
+import SwiftUI
+import BackgroundTime
+
+class ViewController: UIViewController {
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        // Add dashboard button to navigation bar
+        let dashboardButton = UIBarButtonItem(
+            title: "Dashboard",
+            style: .plain,
+            target: self,
+            action: #selector(showDashboard)
+        )
+        navigationItem.rightBarButtonItem = dashboardButton
+    }
+    
+    @objc private func showDashboard() {
+        guard #available(iOS 16.0, *) else {
+            // Handle older iOS versions - perhaps show an alert
+            let alert = UIAlertController(
+                title: "Dashboard Unavailable",
+                message: "The dashboard requires iOS 16.0 or later",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            present(alert, animated: true)
+            return
+        }
+        
+        // Create SwiftUI dashboard wrapped in UIHostingController
+        let dashboardView = BackgroundTimeDashboard()
+        let hostingController = UIHostingController(rootView: dashboardView)
+        
+        // Configure presentation
+        hostingController.modalPresentationStyle = .pageSheet
+        
+        // Present the dashboard
+        present(hostingController, animated: true)
+    }
+}
+```
+
+### Alternative UIKit Approach with Navigation
+
+```swift
+import UIKit
+import SwiftUI
+import BackgroundTime
+
+class MainViewController: UIViewController {
+    
+    @IBAction func dashboardButtonTapped(_ sender: UIButton) {
+        guard #available(iOS 16.0, *) else { return }
+        
+        let dashboardView = BackgroundTimeDashboard()
+        let hostingController = UIHostingController(rootView: dashboardView)
+        
+        // Present in navigation controller for better UX
+        let navController = UINavigationController(rootViewController: hostingController)
+        navController.modalPresentationStyle = .fullScreen
+        
+        // Add close button
+        hostingController.navigationItem.leftBarButtonItem = UIBarButtonItem(
+            barButtonSystemItem: .close,
+            target: self,
+            action: #selector(dismissDashboard)
+        )
+        
+        present(navController, animated: true)
+    }
+    
+    @objc private func dismissDashboard() {
+        dismiss(animated: true)
     }
 }
 ```
@@ -154,6 +274,8 @@ let dashboardData = BackgroundTime.shared.exportDataForDashboard()
 - **System Constraints**: Impact of low power mode, background refresh settings
 - **Failure Patterns**: When and why tasks are most likely to fail
 
+
+
 ## Example App Integration
 
 The package includes a complete example app demonstrating integration in a social media/chat app context:
@@ -183,37 +305,30 @@ The SDK automatically tracks all of these operations without any additional code
 
 ## Dashboard Visualizations
 
-### 📊 Statistics Cards
-Quick overview cards showing:
-- Total executions with trend indicators
-- Success rate with color-coded status
-- Failure count with error categorization
-- Average duration with performance indicators
+### 🎯 **Comprehensive Analytics at Your Fingertips**
 
-### 📈 Charts and Graphs
-- **Hourly Pattern Chart**: Shows when your background tasks typically execute
-- **Duration Trends**: Line chart showing performance over time
-- **Error Distribution**: Bar chart breaking down failure types
-- **Timeline View**: Chronological event stream with filtering
+<table>
+<tr>
+<td width="33%">
 
-### 🔍 Detailed Analysis
-- **Per-Task Metrics**: Individual performance breakdown for each task identifier
-- **System Context**: How device state affects background task performance
-- **Error Details**: Specific failure reasons with suggested improvements
+**📊 Statistics Cards**
+Quick overview with trend indicators, success rates, and performance metrics
 
-## Use Cases
+</td>
+<td width="33%">
 
-### For Managers
-- **Performance Monitoring**: Track background task reliability in production
-- **Resource Planning**: Understand when and how often tasks run
-- **Quality Metrics**: Monitor success rates and failure patterns
-- **User Impact Assessment**: Correlate task performance with user experience
+**📈 Execution Patterns**
+24-hour visualization showing when your tasks typically run
 
-### For Engineers
-- **Debugging**: Identify why background tasks are failing
-- **Optimization**: Find performance bottlenecks and improve efficiency
-- **Testing**: Validate background task behavior across different scenarios
-- **Monitoring**: Real-time visibility into production background task performance
+</td>
+<td width="33%">
+
+**🌟 3D Performance**
+Advanced 3D surface plots for deep performance analysis
+
+</td>
+</tr>
+</table>
 
 ## Architecture
 
@@ -268,6 +383,8 @@ MIT License - see LICENSE file for details
 3. Make your changes
 4. Add tests for new functionality
 5. Submit a pull request
+
+
 
 ## Support
 
