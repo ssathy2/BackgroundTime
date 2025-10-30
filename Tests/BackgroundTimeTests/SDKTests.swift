@@ -179,9 +179,6 @@ struct SDKTests {
         // Test dashboard data export
         let dashboardData = await MainActor.run { sdk.exportDataForDashboard() }
         
-        // Debug: Print information about events and timeline
-        print("Debug: Dashboard data - Events: \(dashboardData.events.count), Timeline: \(dashboardData.timeline.count)")
-        
         // Verify all components of dashboard data
         #expect(dashboardData.statistics.totalTasksScheduled >= 0, "Should have statistics with valid scheduled count")
         #expect(dashboardData.statistics.totalTasksExecuted >= 0, "Should have statistics with valid executed count")

@@ -146,11 +146,6 @@ struct SuccessRateIntegrationTests {
                "24h and all-time executed counts should match for recent data")
         #expect(abs(last24hStats.successRate - allTimeStats.successRate) < 0.001,
                "24h and all-time success rates should match for recent data")
-        
-        print("✅ Integration test complete:")
-        print("   Data Store Success Rate: \(String(format: "%.1f%%", dataStoreStats.successRate * 100))")
-        print("   Dashboard Success Rate: \(String(format: "%.1f%%", dashboardStats.successRate * 100))")
-        print("   Expected Success Rate: 70.0%")
     }
     
     @Test("Edge Case Success Rate Integration")

@@ -97,12 +97,12 @@ public struct BackgroundTimeDashboard: View {
                 }
             }
         }
-        .onChange(of: selectedTimeRange) { _, newRange in
+        .onChange(of: selectedTimeRange) { newRange in
             Task { @MainActor in
                 await viewModel.loadData(for: newRange)
             }
         }
-        .onChange(of: viewModel.error) { _, newError in
+        .onChange(of: viewModel.error) { newError in
             showingError = newError != nil
         }
     }

@@ -511,7 +511,6 @@ struct TaskStatisticsEventFilterTests {
         // Expected: 3 executed (2 started + 1 completion-only), 2 successful completions
         // Success rate should be 2/3 = ~66.7%
         #expect(statistics.totalTasksExecuted >= 2, "Should count at least 2 execution attempts")
-        print("Final test - Executed: \(statistics.totalTasksExecuted), Success Rate: \(statistics.successRate * 100)%")
     }
 
     // MARK: - Edge Cases Tests

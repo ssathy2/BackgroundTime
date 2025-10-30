@@ -21,24 +21,9 @@ public struct OverviewTabView: View {
     }
     
     private var filteredEvents: [BackgroundTaskEvent] {
-        let filtered = viewModel.events.filter { event in
+        return viewModel.events.filter { event in
             selectedTimeRange.contains(event.timestamp)
         }
-        
-        // Debug logging for overview filtering
-        if !filtered.isEmpty {
-            print("📊 Overview Tab - Filtered Events:")
-            print("   - \(selectedTimeRange.debugDescription)")
-            print("   - Total events in view model: \(viewModel.events.count)")
-            print("   - Filtered events: \(filtered.count)")
-            
-            // Show sample events for debugging
-            for event in filtered.prefix(3) {
-                print("   - \(event.type.rawValue): \(event.taskIdentifier), time: \(event.timestamp)")
-            }
-        }
-        
-        return filtered
     }
     
     private var filteredStatistics: BackgroundTaskStatistics? {
@@ -46,14 +31,10 @@ public struct OverviewTabView: View {
             return nil
         }
         
-        let stats = BackgroundTaskDataStore.shared.generateStatistics(
+        return BackgroundTaskDataStore.shared.generateStatistics(
             for: filteredEvents, 
             in: selectedTimeRange.startDate...selectedTimeRange.endDate
         )
-        
-        print("📊 Overview Tab - Statistics: \(stats.totalTasksExecuted) executed, Success: \(String(format: "%.1f", stats.successRate * 100))%")
-        
-        return stats
     }
     
     public var body: some View {

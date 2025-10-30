@@ -60,13 +60,6 @@ struct StatisticsFixValidation {
         
         // Success rate should be 2/4 = 0.5 (50%)
         #expect(abs(statistics.successRate - 0.5) < 0.001, "Success rate should be 50% (0.5)")
-        
-        print("✅ Statistics fix validation passed!")
-        print("   - Executed: \(statistics.totalTasksExecuted)")
-        print("   - Completed: \(statistics.totalTasksCompleted)")
-        print("   - Failed: \(statistics.totalTasksFailed)")
-        print("   - Expired: \(statistics.totalTasksExpired)")
-        print("   - Success Rate: \(statistics.successRate)")
     }
     
     private func createTestSystemInfo() -> SystemInfo {

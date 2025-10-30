@@ -1,7 +1,7 @@
 # BackgroundTime SDK
 
 [![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org)
-[![Platform](https://img.shields.io/badge/Platform-iOS%2015%2B%20%7C%20macOS%2012%2B-lightgrey)](https://developer.apple.com)
+[![Platform](https://img.shields.io/badge/Platform-iOS%2016%2B-lightgrey)](https://developer.apple.com)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Beta](https://img.shields.io/badge/Status-Beta-yellow.svg)](https://github.com/yourusername/BackgroundTime/releases)
 [![CI](https://github.com/ssathy2/BackgroundTime/actions/workflows/ci.yml/badge.svg)](https://github.com/ssathy2/BackgroundTime/actions/workflows/ci.yml)
@@ -132,9 +132,7 @@ struct ContentView: View {
                 }
         }
         .sheet(isPresented: $showDashboard) {
-            if #available(iOS 16.0, *) {
-                BackgroundTimeDashboard()
-            }
+            BackgroundTimeDashboard()
         }
     }
 }
@@ -165,18 +163,6 @@ class ViewController: UIViewController {
     }
     
     @objc private func showDashboard() {
-        guard #available(iOS 16.0, *) else {
-            // Handle older iOS versions - perhaps show an alert
-            let alert = UIAlertController(
-                title: "Dashboard Unavailable",
-                message: "The dashboard requires iOS 16.0 or later",
-                preferredStyle: .alert
-            )
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
-            present(alert, animated: true)
-            return
-        }
-        
         // Create SwiftUI dashboard wrapped in UIHostingController
         let dashboardView = BackgroundTimeDashboard()
         let hostingController = UIHostingController(rootView: dashboardView)
@@ -200,8 +186,6 @@ import BackgroundTime
 class MainViewController: UIViewController {
     
     @IBAction func dashboardButtonTapped(_ sender: UIButton) {
-        guard #available(iOS 16.0, *) else { return }
-        
         let dashboardView = BackgroundTimeDashboard()
         let hostingController = UIHostingController(rootView: dashboardView)
         
@@ -360,15 +344,9 @@ We'd love your feedback on this beta release! Please:
 
 ## Requirements
 
-- iOS 14.0+
-- Xcode 12.0+
-- Swift 5.3+
-
-## Dashboard Requirements
-
-The SwiftUI dashboard requires:
-- iOS 16.0+ (for Charts framework)
-- Falls back gracefully on older versions
+- iOS 16.0+
+- Xcode 14.0+
+- Swift 5.7+
 
 ## License
 

@@ -724,7 +724,7 @@ private struct TaskIdentifierHeaderView: View {
                         .foregroundColor(.blue)
                 }
                 .buttonStyle(.bordered)
-                .buttonBorderShape(.circle)
+                .clipShape(Circle())
             }
         }
         .padding(.horizontal, 16)
