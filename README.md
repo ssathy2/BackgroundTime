@@ -232,8 +232,6 @@ class MainViewController: UIViewController {
 ```swift
 let config = BackgroundTimeConfiguration(
     maxStoredEvents: 2000,           // Maximum events to store locally
-    apiEndpoint: URL(string: "https://your-dashboard.com/api"),
-    enableNetworkSync: true,         // Enable remote dashboard sync
     enableDetailedLogging: true      // Enable detailed logging
 )
 
