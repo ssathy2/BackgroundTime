@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "BackgroundTime",
     platforms: [
-        .iOS(.v15),
+        .iOS(.v16),
         .macOS(.v12),
         .tvOS(.v15),
         .watchOS(.v8),
