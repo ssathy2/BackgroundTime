@@ -69,19 +69,30 @@ public struct ErrorsTabView: View {
 
 public struct ErrorSummarySection: View {
     let errorsByType: [String: Int]
-    
+
     public init(errorsByType: [String: Int]) {
         self.errorsByType = errorsByType
     }
-    
+
+    private var sortedErrorTypes: [String] {
+        Array(errorsByType.keys).sorted()
+    }
+
+    private var chartHeight: CGFloat {
+        let minHeight: CGFloat = 200.0
+        let itemHeight: CGFloat = 30.0
+        let calculatedHeight = CGFloat(errorsByType.count) * itemHeight
+        return max(minHeight, calculatedHeight)
+    }
+
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Error Types")
                 .font(.headline)
                 .padding(.horizontal)
-            
+
             Chart {
-                ForEach(Array(errorsByType.keys).sorted(), id: \.self) { errorType in
+                ForEach(sortedErrorTypes, id: \.self) { errorType in
                     BarMark(
                         x: .value("Count", errorsByType[errorType] ?? 0),
                         y: .value("Error Type", String(errorType.prefix(30)))
@@ -89,7 +100,7 @@ public struct ErrorSummarySection: View {
                     .foregroundStyle(.red)
                 }
             }
-            .frame(height: max(200.0, CGFloat(errorsByType.count) * 30.0))
+            .frame(height: chartHeight)
             .padding(.horizontal)
         }
         .background(Color(.systemBackground))
