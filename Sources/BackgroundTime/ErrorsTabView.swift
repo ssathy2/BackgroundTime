@@ -75,35 +75,58 @@ public struct ErrorSummarySection: View {
     }
 
     private var sortedErrorTypes: [String] {
-        Array(errorsByType.keys).sorted()
+        let keys = Array(errorsByType.keys)
+        return keys.sorted()
     }
 
     private var chartHeight: CGFloat {
         let minHeight: CGFloat = 200.0
         let itemHeight: CGFloat = 30.0
-        let calculatedHeight = CGFloat(errorsByType.count) * itemHeight
+        let count = errorsByType.count
+        let calculatedHeight = CGFloat(count) * itemHeight
         return max(minHeight, calculatedHeight)
     }
 
-    public var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Error Types")
-                .font(.headline)
-                .padding(.horizontal)
+    private func errorCount(for errorType: String) -> Int {
+        return errorsByType[errorType] ?? 0
+    }
 
-            Chart {
-                ForEach(sortedErrorTypes, id: \.self) { errorType in
-                    BarMark(
-                        x: .value("Count", errorsByType[errorType] ?? 0),
-                        y: .value("Error Type", String(errorType.prefix(30)))
-                    )
-                    .foregroundStyle(.red)
-                }
-            }
-            .frame(height: chartHeight)
-            .padding(.horizontal)
+    private func truncatedErrorType(_ errorType: String) -> String {
+        let prefix = errorType.prefix(30)
+        return String(prefix)
+    }
+
+    public var body: some View {
+        let content = VStack(alignment: .leading, spacing: 12) {
+            titleView
+            errorChart
         }
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
+
+        return content
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+    }
+
+    private var titleView: some View {
+        Text("Error Types")
+            .font(.headline)
+            .padding(.horizontal)
+    }
+
+    private var errorChart: some View {
+        Chart {
+            ForEach(sortedErrorTypes, id: \.self) { errorType in
+                let count = errorCount(for: errorType)
+                let label = truncatedErrorType(errorType)
+
+                BarMark(
+                    x: .value("Count", count),
+                    y: .value("Error Type", label)
+                )
+                .foregroundStyle(.red)
+            }
+        }
+        .frame(height: chartHeight)
+        .padding(.horizontal)
     }
 }
